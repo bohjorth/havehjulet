@@ -185,6 +185,15 @@
   .journal-item .info span{font-size:11.5px;color:var(--soil);opacity:0.65;font-family:'JetBrains Mono',monospace;}
   .journal-empty{padding:26px 16px;font-size:13px;color:var(--soil);opacity:0.6;line-height:1.6;}
   .journal-foot{padding:12px 14px;border-top:1px solid var(--line);}
+  .address-item{
+    display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:9px;margin-bottom:3px;cursor:pointer;transition:background .12s;
+  }
+  .address-item:hover{background:var(--parchment-3);}
+  .address-item .ico{width:26px;height:26px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .address-item b{font-size:13px;flex:1;}
+  .address-item .del-addr{border:none;background:transparent;color:var(--soil);opacity:0.4;font-size:14px;padding:2px 4px;}
+  .address-item .del-addr:hover{opacity:1;color:#a83223;}
+  .address-empty{padding:10px 4px;font-size:12px;color:var(--soil);opacity:0.6;line-height:1.5;}
 
   .map-col{position:relative;}
   #map{width:100%;height:100%;background:#1c2e1f;}
@@ -398,6 +407,10 @@
     <div class="view" id="view-map">
       <div class="map-view-inner">
         <div class="journal">
+          <div class="journal-head" style="border-bottom:none;padding-bottom:4px;">
+            <h3>Mine adresser</h3>
+          </div>
+          <div class="journal-list" id="address-list" style="flex:0 0 auto;max-height:180px;border-bottom:1px solid var(--line);padding-bottom:6px;"></div>
           <div class="journal-head">
             <h3>Mine planter</h3>
             <input class="journal-search" id="journal-search" placeholder="Søg blandt dine planter…" oninput="renderJournal()">
@@ -415,6 +428,7 @@
               <button onclick="searchAddress()">Søg</button>
               <div class="addr-suggestions" id="addr-suggestions"></div>
             </div>
+            <button class="toggle-add-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
             <button class="toggle-add-btn" id="add-toggle-btn" onclick="toggleAddMode()">+ Tilføj plante</button>
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
@@ -423,6 +437,32 @@
     </div>
   </main>
 </div>
+
+<!-- ===== ADD ADDRESS MODAL ===== -->
+<div class="modal-overlay" id="address-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Gem adresse</h3>
+      <button class="modal-close" onclick="closeModal('address-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Navn (f.eks. “Hjemme”, “Sommerhus”)</label>
+        <input type="text" id="address-name" placeholder="Min have">
+      </div>
+      <div class="field">
+        <label>Adresse der gemmes</label>
+        <input type="text" id="address-display" disabled style="opacity:0.7;">
+      </div>
+      <div class="auth-hint" style="margin-top:0;">Søg adressen frem i feltet på kortet først, gem den så her — eller flyt/zoom kortet dertil manuelt.</div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('address-modal')">Annuller</button>
+        <button class="primary-btn" onclick="saveAddress()">Gem adresse</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- ===== ADD PLANT MODAL ===== -->
 <div class="modal-overlay" id="add-modal">
@@ -752,6 +792,7 @@ let currentUser = null;
 let gardenData = { center: null, zoom: null, plants: [] };
 let map = null;
 let markerLayer = null;
+let addressMarkerLayer = null;
 let addMode = false;
 let selectedType = 'blomst';
 let pickedDb = null; // db entry chosen while adding a plant
@@ -848,11 +889,12 @@ function handleLogout(){
 async function loadGarden(){
   try{
     const data = await apiFetch('/garden');
-    gardenData = data.garden || {center:null, zoom:null, plants:[]};
+    gardenData = data.garden || {center:null, zoom:null, plants:[], addresses:[]};
   }catch(e){
-    gardenData = {center:null, zoom:null, plants:[]};
+    gardenData = {center:null, zoom:null, plants:[], addresses:[]};
   }
   if(!gardenData.plants) gardenData.plants = [];
+  if(!gardenData.addresses) gardenData.addresses = [];
 }
 
 async function saveGarden(){
@@ -887,6 +929,7 @@ function enterApp(){
   document.getElementById('today-label').textContent = new Date().toLocaleDateString('da-DK', {day:'numeric', month:'long', year:'numeric'});
   initMapIfNeeded();
   renderJournal();
+  renderAddressList();
 }
 
 function switchView(view){
@@ -1014,7 +1057,9 @@ function initMapIfNeeded(){
   }).addTo(map);
 
   markerLayer = L.layerGroup().addTo(map);
+  addressMarkerLayer = L.layerGroup().addTo(map);
   renderMarkers();
+  renderAddressMarkers();
 
   map.on('click', (e)=>{
     if(!addMode) return;
@@ -1113,6 +1158,85 @@ function flyToPlant(id){
   }, 150);
 }
 
+// ---------- Addresses ----------
+function renderAddressList(){
+  const list = document.getElementById('address-list');
+  if(!list) return;
+  if(!gardenData.addresses || !gardenData.addresses.length){
+    list.innerHTML = `<div class="address-empty">Ingen gemte adresser endnu. Søg din adresse på kortet, og tryk “Gem adresse”.</div>`;
+    return;
+  }
+  list.innerHTML = gardenData.addresses.map(a=>`
+    <div class="address-item" onclick="flyToAddress('${a.id}')">
+      <div class="ico">📍</div>
+      <b>${escapeHtml(a.name)}</b>
+      <button class="del-addr" onclick="event.stopPropagation();deleteAddress('${a.id}')" title="Slet">✕</button>
+    </div>`).join('');
+}
+
+function renderAddressMarkers(){
+  if(!addressMarkerLayer) return;
+  addressMarkerLayer.clearLayers();
+  (gardenData.addresses||[]).forEach(a=>{
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:var(--gold,#d9a441);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.35);border:2px solid #fffdf6;">
+              <span style="transform:rotate(45deg);font-size:13px;">🏠</span>
+            </div>`,
+      iconSize:[30,30], iconAnchor:[15,28]
+    });
+    const marker = L.marker([a.lat, a.lng], { icon });
+    marker.bindTooltip(`<div class="tip-inner"><b>${escapeHtml(a.name)}</b></div>`, {className:'plant-tip', direction:'top', offset:[0,-24]});
+    marker.addTo(addressMarkerLayer);
+  });
+}
+
+function openAddressModal(){
+  const c = map ? map.getCenter() : null;
+  document.getElementById('address-name').value = '';
+  document.getElementById('address-display').value = document.getElementById('addr-input').value || (c ? `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}` : '');
+  document.getElementById('address-modal').classList.add('show');
+}
+
+function saveAddress(){
+  const name = document.getElementById('address-name').value.trim();
+  if(!name){ toast('Giv adressen et navn'); return; }
+  if(!map){ toast('Kortet er ikke klar endnu'); return; }
+  const c = map.getCenter();
+  const addr = {
+    id: 'a'+Date.now()+Math.random().toString(36).slice(2,7),
+    name,
+    lat: c.lat,
+    lng: c.lng,
+    zoom: map.getZoom(),
+    display: document.getElementById('address-display').value
+  };
+  if(!gardenData.addresses) gardenData.addresses = [];
+  gardenData.addresses.push(addr);
+  saveGarden();
+  renderAddressList();
+  renderAddressMarkers();
+  closeModal('address-modal');
+  toast('Adresse gemt 📍');
+}
+
+function flyToAddress(id){
+  const a = (gardenData.addresses||[]).find(x=>x.id===id);
+  if(!a) return;
+  switchView('map');
+  setTimeout(()=>{
+    map.setView([a.lat, a.lng], a.zoom || 19, {animate:true});
+  }, 150);
+}
+
+function deleteAddress(id){
+  gardenData.addresses = (gardenData.addresses||[]).filter(a=>a.id!==id);
+  saveGarden();
+  renderAddressList();
+  renderAddressMarkers();
+  toast('Adresse slettet');
+}
+
 // ---------- Add plant modal ----------
 function openAddModal(){
   editingPlantId = null;
@@ -1187,9 +1311,7 @@ function renderDbResults(localMatches, onlineState){
 async function searchOnline(q, localMatches){
   renderDbResults(localMatches, 'loading');
   try{
-    const res = await fetch(`/api/plants/search?q=${encodeURIComponent(q)}`);
-    if(!res.ok) throw new Error('bad response');
-    const data = await res.json();
+    const data = await apiFetch(`/plants/search?q=${encodeURIComponent(q)}`);
     const results = (data.data||[]).slice(0,8).map(d=>({
       id:d.id,
       common_name:d.common_name || (d.scientific_name && d.scientific_name[0]) || 'Ukendt navn',
@@ -1214,9 +1336,7 @@ async function pickExternal(id){
   const box = document.getElementById('db-results');
   box.innerHTML = `<div class="db-result-item" style="opacity:0.6;cursor:default;">Henter detaljer…</div>`;
   try{
-    const res = await fetch(`/api/plants/details/${id}`);
-    if(!res.ok) throw new Error('bad response');
-    const d = await res.json();
+    const d = await apiFetch(`/plants/details/${id}`);
 
     // guess type
     let type = 'blomst';
