@@ -445,6 +445,10 @@
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
           <div class="add-mode-banner" id="area-mode-banner"></div>
+          <div class="add-mode-banner" id="shape-edit-banner">Træk i de gyldne hjørner for at ændre formen — klik på et hjørne for at fjerne det.
+            <button class="mini-btn finish" onclick="saveShapeEdit()">✓ Gem form</button>
+            <button class="mini-btn cancel" onclick="cancelShapeEdit()">✕ Annullér</button>
+          </div>
         </div>
       </div>
     </div>
@@ -811,6 +815,9 @@ let areaMode = false;
 let drawingPoints = [];
 let previewPolygon = null;
 let pendingPolygon = null;
+let editingShapeId = null;
+let editVertexMarkers = [];
+let editingPolygonPreview = null;
 let selectedType = 'blomst';
 let pickedDb = null; // db entry chosen while adding a plant
 let editingPlantId = null;
@@ -1144,11 +1151,27 @@ function updateAreaBanner(){
   if(!banner) return;
   const n = drawingPoints.length;
   let txt = n===0 ? 'Klik på kortet for at sætte det første hjørne af bedet ▱' : `Klik for flere hjørner (${n} sat)`;
-  let btns = `<button class="mini-btn cancel" onclick="cancelAreaDrawing()">✕ Annullér</button>`;
+  let btns = '';
+  if(n>=1){
+    btns += `<button class="mini-btn cancel" onclick="undoLastAreaPoint()">↩ Fortryd sidste</button>`;
+  }
   if(n>=3){
     btns = `<button class="mini-btn finish" onclick="finishAreaDrawing()">✓ Afslut bed</button>` + btns;
   }
+  btns += `<button class="mini-btn cancel" onclick="cancelAreaDrawing()">✕ Annullér alt</button>`;
   banner.innerHTML = `${txt}${btns}`;
+}
+
+function undoLastAreaPoint(){
+  if(!drawingPoints.length) return;
+  drawingPoints.pop();
+  if(previewPolygon){ map.removeLayer(previewPolygon); previewPolygon = null; }
+  if(drawingPoints.length>=2){
+    previewPolygon = L.polygon(drawingPoints, { color:'#d9a441', weight:2, fillColor:'#d9a441', fillOpacity:0.22, dashArray:'6,5' }).addTo(map);
+  } else if(drawingPoints.length===1){
+    previewPolygon = L.circleMarker(drawingPoints[0], { radius:5, color:'#d9a441', fillColor:'#d9a441', fillOpacity:1 }).addTo(map);
+  }
+  updateAreaBanner();
 }
 
 function cancelAreaDrawing(){
@@ -1163,6 +1186,90 @@ function finishAreaDrawing(){
   document.getElementById('area-toggle-btn').classList.remove('active');
   document.getElementById('area-mode-banner').classList.remove('show');
   openAddModal();
+}
+
+// ---------- Shape editing (reshape an existing bed) ----------
+function startShapeEdit(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p || !p.polygon) return;
+  closeModal('detail-modal');
+  switchView('map');
+
+  addMode = false; areaMode = false;
+  document.getElementById('add-toggle-btn').classList.remove('active');
+  document.getElementById('add-mode-banner').classList.remove('show');
+  resetAreaDrawing();
+
+  editingShapeId = id;
+  markerLayer.clearLayers(); // hide normal markers while editing to reduce clutter
+
+  setTimeout(()=>{
+    const bounds = L.latLngBounds(p.polygon.map(pt=>[pt.lat, pt.lng]));
+    map.fitBounds(bounds, {padding:[80,80], maxZoom:21});
+    buildShapeEditLayers(p.polygon);
+    document.getElementById('shape-edit-banner').classList.add('show');
+  }, 150);
+}
+
+function buildShapeEditLayers(points){
+  editVertexMarkers = points.map(pt=>{
+    const marker = L.marker([pt.lat, pt.lng], {
+      draggable: true,
+      icon: L.divIcon({
+        className:'',
+        html:`<div style="width:16px;height:16px;border-radius:50%;background:#d9a441;border:3px solid #fffdf6;box-shadow:0 2px 6px rgba(0,0,0,0.35);transform:translate(-50%,-50%);"></div>`,
+        iconSize:[0,0]
+      })
+    }).addTo(map);
+    marker.on('drag', updateShapeEditPreview);
+    marker.on('click', ()=>removeShapeEditVertex(marker));
+    return marker;
+  });
+  updateShapeEditPreview();
+}
+
+function updateShapeEditPreview(){
+  if(editingPolygonPreview){ map.removeLayer(editingPolygonPreview); editingPolygonPreview = null; }
+  if(editVertexMarkers.length>=2){
+    const latlngs = editVertexMarkers.map(m=>m.getLatLng());
+    editingPolygonPreview = L.polygon(latlngs, { color:'#d9a441', weight:2, fillColor:'#d9a441', fillOpacity:0.22, dashArray:'6,5' }).addTo(map);
+    editingPolygonPreview.bringToBack();
+  }
+}
+
+function removeShapeEditVertex(marker){
+  if(editVertexMarkers.length<=3){ toast('Et bed skal have mindst 3 hjørner'); return; }
+  map.removeLayer(marker);
+  editVertexMarkers = editVertexMarkers.filter(m=>m!==marker);
+  updateShapeEditPreview();
+}
+
+function cleanupShapeEdit(){
+  editVertexMarkers.forEach(m=>map.removeLayer(m));
+  editVertexMarkers = [];
+  if(editingPolygonPreview){ map.removeLayer(editingPolygonPreview); editingPolygonPreview = null; }
+  document.getElementById('shape-edit-banner').classList.remove('show');
+  editingShapeId = null;
+}
+
+function cancelShapeEdit(){
+  cleanupShapeEdit();
+  renderMarkers();
+}
+
+function saveShapeEdit(){
+  if(editVertexMarkers.length < 3){ toast('Mindst 3 hjørner krævet'); return; }
+  const idx = gardenData.plants.findIndex(p=>p.id===editingShapeId);
+  if(idx<0){ cancelShapeEdit(); return; }
+  const polygon = editVertexMarkers.map(m=>{ const ll = m.getLatLng(); return {lat: ll.lat, lng: ll.lng}; });
+  gardenData.plants[idx].polygon = polygon;
+  gardenData.plants[idx].lat = polygon.reduce((s,p)=>s+p.lat,0)/polygon.length;
+  gardenData.plants[idx].lng = polygon.reduce((s,p)=>s+p.lng,0)/polygon.length;
+  saveGarden();
+  cleanupShapeEdit();
+  renderMarkers();
+  renderJournal();
+  toast('Form gemt ▱');
 }
 
 async function searchAddress(){
@@ -1732,6 +1839,7 @@ function openDetail(id){
     ${p.notes ? `<div class="detail-note-box"><b>Dine noter:</b><br>${escapeHtml(p.notes)}</div>` : ''}
     <div class="modal-actions">
       <button class="secondary-btn delete-plant-btn" onclick="deletePlant('${p.id}')">Slet plante</button>
+      ${p.polygon ? `<button class="secondary-btn" onclick="startShapeEdit('${p.id}')">✎ Ret form</button>` : ''}
       <button class="primary-btn" onclick="editPlant('${p.id}')">Redigér</button>
     </div>
   `;
