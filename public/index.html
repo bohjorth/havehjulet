@@ -256,7 +256,7 @@
   .type-choice button.active{border-color:var(--moss);background:var(--moss);color:var(--parchment);}
   .db-search-wrap{position:relative;margin-bottom:16px;}
   .db-results{
-    border:1px solid var(--line);border-radius:9px;background:#fffdf6;max-height:190px;overflow-y:auto;margin-top:6px;display:none;
+    border:1px solid var(--line);border-radius:9px;background:#fffdf6;max-height:340px;overflow-y:auto;margin-top:6px;display:none;
   }
   .db-results.show{display:block;}
   .db-result-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
@@ -1275,18 +1275,20 @@ function filterDb(){
   if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
 
   const localMatches = PLANT_DB.filter(p=>p.name.toLowerCase().includes(q)).slice(0,6);
+  onlineStates.gbif = null;
   renderDbResults(localMatches, null, null);
   box.classList.add('show');
 
   clearTimeout(dbSearchTimer);
   if(q.length < 2) return;
   dbSearchTimer = setTimeout(()=>{
+    searchGbif(q, localMatches);
     searchOnline(q, localMatches, 'perenual', '/plants/search', '/plants/details/', pickExternal);
     searchOnline(q, localMatches, 'trefle', '/trefle/search', '/trefle/details/', pickTrefle);
   }, 450);
 }
 
-let onlineStates = { perenual: null, trefle: null };
+let onlineStates = { gbif: null, perenual: null, trefle: null };
 
 function renderOnlineSection(label, state, onPick){
   let html = `<div style="padding:8px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">${label}</div>`;
@@ -1321,10 +1323,55 @@ function renderDbResults(localMatches, perenualState, trefleState){
     html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen match i biblioteket</div>`;
   }
 
+  html += renderOnlineSection('Dansk navn → latin (GBIF)', onlineStates.gbif, 'pickGbif');
   html += renderOnlineSection('Søg online — Perenual', onlineStates.perenual, 'pickExternal');
   html += renderOnlineSection('Søg online — Trefle', onlineStates.trefle, 'pickTrefle');
 
   box.innerHTML = html;
+}
+
+async function searchGbif(q, localMatches){
+  onlineStates.gbif = 'loading';
+  renderDbResults(localMatches, undefined, undefined);
+  try{
+    const url = `https://api.gbif.org/v1/species/search?q=${encodeURIComponent(q)}&language=dan&kingdom=Plantae&status=ACCEPTED&limit=15`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('bad response');
+    const data = await r.json();
+    const seen = new Set();
+    const results = (data.results||[]).filter(d=>{
+      const name = d.canonicalName || d.scientificName;
+      if(!name || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    }).slice(0,15).map(d=>({
+      id: d.key,
+      vernacular: d.vernacularName || null,
+      scientific: d.canonicalName || d.scientificName,
+      common_name: d.vernacularName || d.canonicalName || d.scientificName,
+      thumb: null
+    }));
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates.gbif = results;
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }catch(e){
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates.gbif = 'error';
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }
+}
+
+function pickGbif(key){
+  const item = (Array.isArray(onlineStates.gbif) ? onlineStates.gbif : []).find(r=>r.id===key);
+  if(!item) return;
+  if(item.vernacular){
+    document.getElementById('plant-name').value = item.vernacular;
+  }
+  toast(`Fundet: ${item.scientific} — søger nu Perenual/Trefle for pasningsinfo…`);
+  document.getElementById('db-search').value = item.scientific;
+  filterDb();
 }
 
 async function searchOnline(q, localMatches, key, searchPath, detailsPathPrefix, pickFn){
@@ -1332,7 +1379,7 @@ async function searchOnline(q, localMatches, key, searchPath, detailsPathPrefix,
   renderDbResults(localMatches, undefined, undefined);
   try{
     const data = await apiFetch(`${searchPath}?q=${encodeURIComponent(q)}`);
-    const results = (data.data||[]).slice(0,8).map(d=>({
+    const results = (data.data||[]).slice(0,25).map(d=>({
       id:d.id,
       common_name:d.common_name || (d.scientific_name && (Array.isArray(d.scientific_name)?d.scientific_name[0]:d.scientific_name)) || 'Ukendt navn',
       scientific: Array.isArray(d.scientific_name) ? d.scientific_name[0] : d.scientific_name,
