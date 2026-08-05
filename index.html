@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Havehjulet</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<meta name="theme-color" content="#28402c">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --moss:#28402c;
+    --moss-light:#3c5c3f;
+    --fern:#6f9457;
+    --clay:#a85c32;
+    --clay-light:#c37a4f;
+    --soil:#4a3b2a;
+    --parchment:#f4efdd;
+    --parchment-2:#eae0c2;
+    --parchment-3:#ddd0a8;
+    --gold:#d9a441;
+    --ink:#2a2620;
+    --flower:#bd5468;
+    --bush:#5b8c4a;
+    --tree:#2f4f30;
+    --line:rgba(42,38,32,0.14);
+    --shadow: 0 10px 30px rgba(42,38,32,0.16);
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--parchment);
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--gold);color:var(--ink);}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:'Inter',sans-serif;cursor:pointer;}
+  input,select,textarea{font-family:'Inter',sans-serif;}
+
+  /* background texture: subtle topographic-ish dotted field */
+  .field-texture{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image: radial-gradient(circle, rgba(42,38,32,0.06) 1px, transparent 1.4px);
+    background-size:22px 22px;
+    opacity:0.6;
+  }
+
+  /* ===== AUTH SCREEN ===== */
+  #auth-screen{
+    position:relative;z-index:1;
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .auth-card{
+    background:var(--parchment-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    width:100%;max-width:960px;
+    display:grid;grid-template-columns:1.1fr 1fr;
+    overflow:hidden;
+    min-height:560px;
+  }
+  .auth-hero{
+    background:
+      radial-gradient(circle at 30% 20%, rgba(217,164,65,0.35), transparent 45%),
+      linear-gradient(160deg, var(--moss) 0%, #1c2e1f 100%);
+    color:var(--parchment);
+    padding:44px 40px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;
+  }
+  .auth-hero .wheel-deco{position:absolute;right:-60px;bottom:-60px;opacity:0.5;}
+  .logo-row{display:flex;align-items:center;gap:12px;position:relative;z-index:1;}
+  .logo-row .tagline{font-size:12.5px;letter-spacing:0.06em;text-transform:uppercase;color:var(--parchment-3);margin-top:2px;}
+  .auth-hero h1{font-size:40px;line-height:1.05;font-weight:600;margin:28px 0 14px;position:relative;z-index:1;}
+  .auth-hero p{font-size:15px;line-height:1.55;color:#e4dcc0;max-width:380px;position:relative;z-index:1;}
+  .month-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;position:relative;z-index:1;padding-top:24px;}
+  .month-chip{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.04em;
+    border:1px solid rgba(244,239,221,0.25);border-radius:999px;padding:5px 10px;color:#d8cfa9;
+  }
+  .month-chip.active{background:var(--gold);color:var(--ink);border-color:var(--gold);font-weight:600;}
+
+  .auth-form-side{padding:44px 44px;display:flex;flex-direction:column;justify-content:center;}
+  .auth-tabs{display:flex;gap:4px;background:var(--parchment-3);padding:4px;border-radius:999px;margin-bottom:28px;width:fit-content;}
+  .auth-tab{border:none;background:transparent;padding:8px 20px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--soil);opacity:0.6;}
+  .auth-tab.active{background:var(--moss);color:var(--parchment);opacity:1;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);margin-bottom:6px;}
+  .field input{
+    width:100%;padding:12px 14px;border-radius:9px;border:1.5px solid var(--line);
+    background:#fffdf6;font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s;
+  }
+  .field input:focus{border-color:var(--fern);}
+  .primary-btn{
+    background:var(--moss);color:var(--parchment);border:none;border-radius:9px;
+    padding:13px 20px;font-size:14.5px;font-weight:600;width:100%;margin-top:6px;
+    transition:background .15s, transform .1s;
+  }
+  .primary-btn:hover{background:var(--moss-light);}
+  .primary-btn:active{transform:scale(0.98);}
+  .auth-msg{font-size:13px;margin-top:12px;padding:10px 12px;border-radius:8px;display:none;}
+  .auth-msg.show{display:block;}
+  .auth-msg.error{background:#f3d9d3;color:#8a3223;}
+  .auth-msg.ok{background:#dde8cf;color:#3a5620;}
+  .auth-hint{font-size:12.5px;color:var(--soil);opacity:0.65;margin-top:18px;line-height:1.5;}
+
+  /* ===== APP SHELL ===== */
+  #app-shell{display:none;min-height:100vh;position:relative;z-index:1;flex-direction:column;}
+  header.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 26px;background:var(--parchment-2);border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:50;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:var(--moss);}
+  .brand .sub{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.05em;color:var(--soil);opacity:0.55;text-transform:uppercase;}
+  nav.view-tabs{display:flex;gap:6px;background:var(--parchment-3);padding:4px;border-radius:999px;}
+  nav.view-tabs button{
+    border:none;background:transparent;padding:8px 18px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--soil);opacity:0.65;
+  }
+  nav.view-tabs button.active{background:var(--moss);color:var(--parchment);opacity:1;}
+  .topbar-right{display:flex;align-items:center;gap:14px;}
+  .user-pill{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--soil);background:var(--parchment-3);padding:6px 12px;border-radius:999px;}
+  .logout-btn{border:1.5px solid var(--line);background:transparent;color:var(--soil);padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;}
+  .logout-btn:hover{border-color:var(--clay);color:var(--clay);}
+
+  main{flex:1;position:relative;}
+  .view{display:none;padding:34px 26px 60px;max-width:1240px;margin:0 auto;}
+  .view.active{display:block;}
+
+  /* ===== DASHBOARD / YEAR WHEEL ===== */
+  .dash-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;margin-bottom:6px;}
+  .dash-head h2{font-size:30px;margin:0;color:var(--moss);}
+  .dash-head .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--clay);margin:0 0 6px;}
+  .today-mono{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--soil);opacity:0.7;}
+
+  .dash-grid{display:grid;grid-template-columns:420px 1fr;gap:36px;margin-top:26px;align-items:start;}
+  @media (max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+  .wheel-wrap{display:flex;flex-direction:column;align-items:center;}
+  .wheel-wrap svg{overflow:visible;}
+  .wedge{cursor:pointer;transition:opacity .15s, transform .18s;transform-origin:250px 250px;}
+  .wedge:hover{opacity:0.9;}
+  .wedge.selected{filter:drop-shadow(0 0 0 rgba(0,0,0,0));}
+  .wedge-label{font-family:'JetBrains Mono',monospace;font-weight:600;pointer-events:none;user-select:none;}
+  .wedge-count{pointer-events:none;user-select:none;}
+  .wheel-center-label{font-family:'Fraunces',serif;font-weight:600;}
+  .reset-month{margin-top:14px;font-size:12.5px;border:1.5px solid var(--line);background:#fffdf6;color:var(--soil);padding:7px 16px;border-radius:999px;font-weight:600;}
+  .reset-month:hover{border-color:var(--fern);color:var(--fern);}
+
+  .task-panel{background:var(--parchment-2);border:1px solid var(--line);border-radius:var(--radius);padding:26px 28px;min-height:400px;}
+  .task-panel h3{margin:0 0 4px;font-size:22px;color:var(--moss);}
+  .task-panel .month-sub{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--clay);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:18px;}
+  .task-group{margin-bottom:22px;}
+  .task-group h4{font-size:12.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);opacity:0.7;margin:0 0 10px;font-weight:600;}
+  .task-item{
+    display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:#fffdf6;border-radius:9px;margin-bottom:8px;border:1px solid var(--line);
+  }
+  .task-item .icon{font-size:18px;flex-shrink:0;}
+  .task-item .txt{font-size:13.8px;line-height:1.4;}
+  .task-item .txt b{color:var(--moss);}
+  .empty-note{font-size:13.5px;color:var(--soil);opacity:0.6;font-style:italic;padding:8px 0;}
+
+  /* ===== MAP VIEW ===== */
+  .map-view-inner{display:grid;grid-template-columns:300px 1fr;gap:0;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow);height:calc(100vh - 170px);min-height:560px;}
+  @media (max-width:900px){.map-view-inner{grid-template-columns:1fr;height:auto;}}
+  .journal{background:var(--parchment-2);display:flex;flex-direction:column;border-right:1px solid var(--line);}
+  .journal-head{padding:18px 18px 12px;border-bottom:1px solid var(--line);}
+  .journal-head h3{margin:0 0 10px;font-size:16px;color:var(--moss);}
+  .journal-search{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--line);font-size:13px;background:#fffdf6;}
+  .journal-list{flex:1;overflow-y:auto;padding:8px 10px;}
+  .journal-item{
+    display:flex;gap:10px;align-items:flex-start;padding:10px 10px;border-radius:9px;margin-bottom:4px;cursor:pointer;transition:background .12s;
+  }
+  .journal-item:hover{background:var(--parchment-3);}
+  .journal-item .ico{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+  .journal-item .info b{display:block;font-size:13.5px;color:var(--ink);}
+  .journal-item .info span{font-size:11.5px;color:var(--soil);opacity:0.65;font-family:'JetBrains Mono',monospace;}
+  .journal-empty{padding:26px 16px;font-size:13px;color:var(--soil);opacity:0.6;line-height:1.6;}
+  .journal-foot{padding:12px 14px;border-top:1px solid var(--line);}
+  .address-item{
+    display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:9px;margin-bottom:3px;cursor:pointer;transition:background .12s;
+  }
+  .address-item:hover{background:var(--parchment-3);}
+  .address-item .ico{width:26px;height:26px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .address-item b{font-size:13px;flex:1;}
+  .address-item .del-addr{border:none;background:transparent;color:var(--soil);opacity:0.4;font-size:14px;padding:2px 4px;}
+  .address-item .del-addr:hover{opacity:1;color:#a83223;}
+  .address-empty{padding:10px 4px;font-size:12px;color:var(--soil);opacity:0.6;line-height:1.5;}
+
+  .map-col{position:relative;}
+  #map{width:100%;height:100%;background:#1c2e1f;}
+  .map-toolbar{
+    position:absolute;top:14px;left:14px;right:14px;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;
+  }
+  .addr-search{
+    flex:1;min-width:220px;display:flex;background:#fffdf6;border-radius:9px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line);
+  }
+  .addr-search input{flex:1;border:none;padding:11px 13px;font-size:13.5px;outline:none;background:transparent;}
+  .addr-search button{border:none;background:var(--moss);color:var(--parchment);padding:0 16px;font-size:13px;font-weight:600;}
+  .toggle-add-btn{
+    background:var(--clay);color:#fff;border:none;border-radius:9px;padding:11px 16px;font-size:13px;font-weight:600;box-shadow:var(--shadow);white-space:nowrap;
+  }
+  .toggle-add-btn.active{background:var(--gold);color:var(--ink);}
+  .addr-suggestions{
+    position:absolute;top:100%;left:0;right:0;background:#fffdf6;border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:var(--shadow);z-index:1001;
+  }
+  .addr-suggestions div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .addr-suggestions div:last-child{border-bottom:none;}
+  .addr-suggestions div:hover{background:var(--parchment-3);}
+  .add-mode-banner{
+    position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);
+    padding:9px 18px;border-radius:999px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow);z-index:1000;display:none;
+  }
+  .add-mode-banner.show{display:block;}
+  .add-mode-banner .mini-btn{
+    border:none;border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;margin-left:8px;cursor:pointer;
+  }
+  .add-mode-banner .mini-btn.finish{background:var(--moss);color:var(--parchment);}
+  .add-mode-banner .mini-btn.cancel{background:rgba(42,38,32,0.15);color:var(--ink);}
+
+  .leaflet-tooltip.plant-tip{
+    background:#fffdf6;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:0;overflow:hidden;
+  }
+  .tip-inner{padding:8px 10px;max-width:190px;}
+  .tip-inner .tip-img{font-size:26px;line-height:1;margin-bottom:4px;}
+  .tip-inner b{font-size:12.5px;display:block;color:var(--moss);}
+  .tip-inner .tip-meta{font-size:10.8px;color:var(--soil);opacity:0.75;font-family:'JetBrains Mono',monospace;margin-top:2px;line-height:1.4;}
+
+  /* ===== MODALS ===== */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(24,20,14,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--parchment);border-radius:var(--radius);max-width:520px;width:100%;max-height:88vh;overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .modal-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{margin:0;font-size:19px;color:var(--moss);}
+  .modal-close{border:none;background:transparent;font-size:20px;color:var(--soil);opacity:0.6;line-height:1;}
+  .modal-close:hover{opacity:1;}
+  .modal-body{padding:22px 24px;}
+  .type-choice{display:flex;gap:8px;margin-bottom:16px;}
+  .type-choice button{
+    flex:1;border:1.5px solid var(--line);background:#fffdf6;padding:10px 8px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--soil);
+  }
+  .type-choice button.active{border-color:var(--moss);background:var(--moss);color:var(--parchment);}
+  .db-search-wrap{position:relative;margin-bottom:16px;}
+  .db-results{
+    border:1px solid var(--line);border-radius:9px;background:#fffdf6;max-height:340px;overflow-y:auto;margin-top:6px;display:none;
+  }
+  .db-results.show{display:block;}
+  .db-result-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
+  .db-result-item:last-child{border-bottom:none;}
+  .db-result-item:hover{background:var(--parchment-3);}
+  .db-picked{
+    display:flex;align-items:center;gap:10px;background:var(--parchment-2);border:1px solid var(--fern);border-radius:9px;padding:10px 12px;margin-bottom:16px;font-size:13px;
+  }
+  .db-picked .clear-pick{margin-left:auto;border:none;background:transparent;color:var(--clay);font-size:12px;font-weight:600;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  textarea.notes{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid var(--line);background:#fffdf6;font-size:13.5px;min-height:70px;resize:vertical;}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .secondary-btn{flex:1;background:transparent;border:1.5px solid var(--line);color:var(--soil);border-radius:9px;padding:12px;font-size:13.5px;font-weight:600;}
+  .secondary-btn:hover{border-color:var(--clay);color:var(--clay);}
+  .modal .primary-btn{flex:1.4;margin-top:0;}
+
+  /* detail modal */
+  .detail-hero{display:flex;gap:16px;align-items:center;margin-bottom:18px;}
+  .detail-emoji{font-size:52px;width:80px;height:80px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .detail-emoji img{width:100%;height:100%;object-fit:cover;border-radius:16px;}
+  .detail-title h4{margin:0 0 4px;font-size:20px;color:var(--moss);}
+  .detail-title .type-tag{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;background:var(--parchment-3);padding:3px 9px;border-radius:999px;color:var(--soil);}
+  .detail-stats{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap;}
+  .detail-stats div{font-size:12px;color:var(--soil);}
+  .detail-stats b{display:block;font-size:14px;color:var(--ink);font-family:'JetBrains Mono',monospace;}
+  .detail-desc{font-size:13.8px;line-height:1.55;color:var(--ink);margin-bottom:16px;}
+  .detail-tasks h5{font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);opacity:0.7;margin:0 0 10px;}
+  .detail-task-row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .detail-task-row:last-child{border-bottom:none;}
+  .detail-task-row .m{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--clay);width:38px;flex-shrink:0;}
+  .detail-task-row.current .m{color:var(--gold);}
+  .detail-note-box{background:var(--parchment-2);border-radius:9px;padding:12px 14px;font-size:13px;margin-top:14px;color:var(--soil);}
+  .delete-plant-btn{color:#a83223;border-color:#e2c3ba;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--moss);color:var(--parchment);padding:12px 22px;border-radius:999px;font-size:13.5px;font-weight:600;
+    box-shadow:var(--shadow);z-index:3000;opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="field-texture"></div>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-hero">
+      <div class="logo-row">
+        <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+          <circle cx="21" cy="21" r="19" stroke="#d9a441" stroke-width="1.4" opacity="0.7"/>
+          <path d="M21 30c0-6 -5-9-5-15 0 6-9 3-9 3s3 9 9 9 5-3 5 3" fill="#6f9457"/>
+          <path d="M21 30V13" stroke="#d9a441" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M21 18c0-5 5-8 5-8" stroke="#f4efdd" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
+        </svg>
+        <div>
+          <div class="name" style="color:#f4efdd;font-size:18px;">Havehjulet</div>
+          <div class="tagline">Din have, hele året</div>
+        </div>
+      </div>
+      <h1>Se hele haven fra oven — og hvad den beder om lige nu.</h1>
+      <p>Find din adresse på satellitfoto, markér hver plante du har plantet, og lad årshjulet minde dig om hvornår der skal gødes, beskæres og høstes.</p>
+      <div class="month-strip" id="hero-month-strip"></div>
+    </div>
+
+    <div class="auth-form-side">
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">Log ind</button>
+        <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Opret konto</button>
+      </div>
+
+      <div id="login-form">
+        <div class="field">
+          <label>Brugernavn</label>
+          <input type="text" id="login-username" autocomplete="username" placeholder="f.eks. mette">
+        </div>
+        <div class="field">
+          <label>Adgangskode</label>
+          <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button class="primary-btn" onclick="handleLogin()">Log ind</button>
+        <div class="auth-msg" id="login-msg"></div>
+      </div>
+
+      <div id="register-form" style="display:none;">
+        <div class="field">
+          <label>Vælg brugernavn</label>
+          <input type="text" id="reg-username" autocomplete="username" placeholder="f.eks. mette">
+        </div>
+        <div class="field">
+          <label>Vælg adgangskode</label>
+          <input type="password" id="reg-password" autocomplete="new-password" placeholder="Mindst 4 tegn">
+        </div>
+        <button class="primary-btn" onclick="handleRegister()">Opret konto</button>
+        <div class="auth-msg" id="register-msg"></div>
+      </div>
+
+      <div class="auth-hint">Flere kan bruge Havehjulet — hver konto har sit eget kort og sine egne planter, gemt automatisk.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 42 42" fill="none">
+        <circle cx="21" cy="21" r="19" stroke="#a85c32" stroke-width="1.4" opacity="0.5"/>
+        <path d="M21 30c0-6 -5-9-5-15 0 6-9 3-9 3s3 9 9 9 5-3 5 3" fill="#6f9457"/>
+        <path d="M21 30V13" stroke="#a85c32" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="name">Havehjulet</div>
+        <div class="sub">Have &amp; årshjul</div>
+      </div>
+    </div>
+    <nav class="view-tabs">
+      <button id="tab-dash" class="active" onclick="switchView('dash')">Årshjul</button>
+      <button id="tab-map" onclick="switchView('map')">Havekort</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="user-pill" id="user-pill"></span>
+      <button class="logout-btn" onclick="handleLogout()">Log ud</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== DASHBOARD VIEW ===== -->
+    <div class="view active" id="view-dash">
+      <div class="dash-head">
+        <div>
+          <p class="eyebrow">Havealmanak</p>
+          <h2>Hvad skal der ske i haven?</h2>
+        </div>
+        <div class="today-mono" id="today-label"></div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="wheel-wrap">
+          <svg id="year-wheel" width="500" height="500" viewBox="0 0 500 500"></svg>
+          <button class="reset-month" id="reset-month-btn" onclick="selectMonth(currentMonthIndex(), true)">Vis denne måned</button>
+        </div>
+
+        <div class="task-panel">
+          <h3 id="panel-month-name">-</h3>
+          <div class="month-sub" id="panel-month-sub">Opgaver</div>
+          <div id="panel-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MAP VIEW ===== -->
+    <div class="view" id="view-map">
+      <div class="map-view-inner">
+        <div class="journal">
+          <div class="journal-head" style="border-bottom:none;padding-bottom:4px;">
+            <h3>Mine adresser</h3>
+          </div>
+          <div class="journal-list" id="address-list" style="flex:0 0 auto;max-height:180px;border-bottom:1px solid var(--line);padding-bottom:6px;"></div>
+          <div class="journal-head">
+            <h3>Mine planter</h3>
+            <input class="journal-search" id="journal-search" placeholder="Søg blandt dine planter…" oninput="renderJournal()">
+          </div>
+          <div class="journal-list" id="journal-list"></div>
+          <div class="journal-foot">
+            <div class="today-mono" style="opacity:0.6;font-size:11px;">Klik “Tilføj plante” og peg på kortet</div>
+          </div>
+        </div>
+        <div class="map-col">
+          <div id="map"></div>
+          <div class="map-toolbar">
+            <div class="addr-search" style="position:relative;">
+              <input type="text" id="addr-input" placeholder="Søg efter din adresse…" onkeydown="if(event.key==='Enter')searchAddress()">
+              <button onclick="searchAddress()">Søg</button>
+              <div class="addr-suggestions" id="addr-suggestions"></div>
+            </div>
+            <button class="toggle-add-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
+            <button class="toggle-add-btn" id="add-toggle-btn" onclick="toggleAddMode()">+ Tilføj plante</button>
+            <button class="toggle-add-btn" id="area-toggle-btn" onclick="toggleAreaMode()">▱ Tilføj bed</button>
+          </div>
+          <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
+          <div class="add-mode-banner" id="area-mode-banner"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== ADD ADDRESS MODAL ===== -->
+<div class="modal-overlay" id="address-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Gem adresse</h3>
+      <button class="modal-close" onclick="closeModal('address-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Navn (f.eks. “Hjemme”, “Sommerhus”)</label>
+        <input type="text" id="address-name" placeholder="Min have">
+      </div>
+      <div class="field">
+        <label>Adresse der gemmes</label>
+        <input type="text" id="address-display" disabled style="opacity:0.7;">
+      </div>
+      <div class="auth-hint" style="margin-top:0;">Søg adressen frem i feltet på kortet først, gem den så her — eller flyt/zoom kortet dertil manuelt.</div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('address-modal')">Annuller</button>
+        <button class="primary-btn" onclick="saveAddress()">Gem adresse</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== ADD PLANT MODAL ===== -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="add-modal-title">Ny plante</h3>
+      <button class="modal-close" onclick="closeModal('add-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="type-choice" id="type-choice">
+        <button data-type="blomst" onclick="pickType('blomst')">🌸 Blomst</button>
+        <button data-type="busk" onclick="pickType('busk')">🌿 Busk</button>
+        <button data-type="træ" onclick="pickType('træ')">🌳 Træ</button>
+      </div>
+
+      <div class="field">
+        <label>Søg efter plante (bibliotek + online)</label>
+        <div class="db-search-wrap">
+          <input type="text" id="db-search" placeholder="f.eks. rose, hortensia, japansk løn…" oninput="filterDb()" onfocus="filterDb()">
+          <div class="db-results" id="db-results"></div>
+        </div>
+      </div>
+
+      <div id="db-picked-box"></div>
+
+      <div class="field">
+        <label>Navn (dit eget, f.eks. “Rose ved terrassen”)</label>
+        <input type="text" id="plant-name">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Højde</label>
+          <input type="text" id="plant-height" placeholder="f.eks. 1-2 m">
+        </div>
+        <div class="field">
+          <label>Blomstrer</label>
+          <input type="text" id="plant-bloom" placeholder="f.eks. juni-sept">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Billede-URL (valgfrit)</label>
+        <input type="text" id="plant-image" placeholder="https://…">
+      </div>
+
+      <div class="field">
+        <label>Noter</label>
+        <textarea class="notes" id="plant-notes" placeholder="Egne noter om denne plante…"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('add-modal')">Annuller</button>
+        <button class="primary-btn" onclick="savePlant()">Gem plante</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETAIL MODAL ===== -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Plantedetaljer</h3>
+      <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ======================================================
+   HAVEHJULET — app logic
+   ====================================================== */
+
+const MONTHS = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const MONTHS_FULL = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
+
+const SEASON_COLOR = {
+  // index 0=Jan ... 11=Dec
+  winter:'#5c7a8a', spring:'#6f9457', summer:'#d9a441', autumn:'#a85c32'
+};
+function seasonForMonth(i){
+  if([11,0,1].includes(i)) return SEASON_COLOR.winter;
+  if([2,3,4].includes(i)) return SEASON_COLOR.spring;
+  if([5,6,7].includes(i)) return SEASON_COLOR.summer;
+  return SEASON_COLOR.autumn;
+}
+
+const TYPE_COLOR = { blomst:'#bd5468', busk:'#5b8c4a', 'træ':'#2f4f30' };
+const TYPE_LABEL = { blomst:'Blomst', busk:'Busk', 'træ':'Træ' };
+
+// ---------- Plant library ----------
+const PLANT_DB = [
+  {name:'Rose', type:'busk', height:'1-2 m', bloom:'jun-sep', icon:'🌹', desc:'Klassisk havefavorit. Trives bedst i sol med gødet, veldrænet jord.',
+   tasks:{3:'Beskær vinterskudte og syge grene, giv rosengødning',5:'Gød igen',6:'Fjern udblomstrede blomster løbende',10:'Dæk rodhalsen til med jord eller bark inden frost'}},
+  {name:'Hortensia', type:'busk', height:'1-1,5 m', bloom:'jul-sep', icon:'🌸', desc:'Store blomsterkugler. Farven kan afhænge af jordens pH. Skal vandes rigeligt.',
+   tasks:{3:'Beskær gamle blomsterstande, undgå at klippe nye skud',4:'Gød med langtidsvirkende gødning',7:'Vand rigeligt i tørre perioder'}},
+  {name:'Syren', type:'busk', height:'2-4 m', bloom:'maj', icon:'🌸', desc:'Duftende og staldbaseret. Blomstrer på sidste års skud.',
+   tasks:{6:'Beskær straks efter blomstring',3:'Gød med kompost eller universalgødning'}},
+  {name:'Forsythia', type:'busk', height:'1-2 m', bloom:'apr', icon:'💛', desc:'Et af forårets første gule blomstertegn.',
+   tasks:{5:'Beskær efter blomstring for tætte skud næste år'}},
+  {name:'Spiræa', type:'busk', height:'1-1,5 m', bloom:'maj-jun', icon:'🌸', desc:'Nem og hårdfør hækplante med hvide eller lyserøde blomsterklaser.',
+   tasks:{6:'Beskær efter blomstring',3:'Gød i vækstsæsonens start'}},
+  {name:'Buksbom', type:'busk', height:'0,5-3 m', bloom:'-', icon:'🌿', desc:'Stedsegrøn formklippet hæk- og topiary-plante.',
+   tasks:{6:'Klip form/hæk',8:'Klip en gang mere inden efteråret'}},
+  {name:'Taks', type:'træ', height:'3-10 m', bloom:'-', icon:'🌲', desc:'Stedsegrøn, tåler hård beskæring. Alle dele giftige.',
+   tasks:{9:'Klip i form'}},
+  {name:'Rhododendron', type:'busk', height:'1-3 m', bloom:'maj', icon:'🌸', desc:'Kræver sur, muldrig jord og skygge/halvskygge.',
+   tasks:{6:'Fjern udblomstrede blomster',4:'Gød med surbundsgødning'}},
+  {name:'Pæon', type:'blomst', height:'0,6-1 m', bloom:'maj-jun', icon:'🌸', desc:'Staude med store, duftende blomster. Meget langlivet.',
+   tasks:{3:'Sæt støtte op til stænglerne inden de bliver høje',10:'Skær visne stængler helt ned til jorden'}},
+  {name:'Lavendel', type:'busk', height:'0,3-0,6 m', bloom:'jun-aug', icon:'💜', desc:'Duftende, tørketolerant, tiltrækker bier.',
+   tasks:{4:'Beskær let for at holde formen',9:'Beskær efter blomstring, ikke ind i det gamle træ'}},
+  {name:'Tulipan', type:'blomst', height:'0,2-0,5 m', bloom:'apr', icon:'🌷', desc:'Løgplante, plantes om efteråret.',
+   tasks:{10:'Plant løg 10-15 cm dybt',6:'Fjern visne blade når de er helt gule'}},
+  {name:'Påskelilje', type:'blomst', height:'0,3-0,4 m', bloom:'mar-apr', icon:'🌼', desc:'Robust løgblomst, blomstrer år efter år uden besvær.',
+   tasks:{9:'Plant løg',5:'Fjern visne blade, ikke før de er gule'}},
+  {name:'Prydkirsebær', type:'træ', height:'4-8 m', bloom:'apr-maj', icon:'🌸', desc:'Spektakulær forårsblomstring i lyserødt eller hvidt.',
+   tasks:{7:'Beskær let lige efter blomstring',3:'Gød ved vækstsæsonens start'}},
+  {name:'Æbletræ', type:'træ', height:'3-6 m', bloom:'maj', icon:'🍎', desc:'Klassisk frugttræ. Kræver årlig beskæring for godt udbytte.',
+   tasks:{2:'Beskær i frostfri periode, inden saftspring',10:'Høst æbler',3:'Gød med kalium- og fosforrig gødning'}},
+  {name:'Fuglekirsebær', type:'træ', height:'8-15 m', bloom:'apr-maj', icon:'🌳', desc:'Hurtigtvoksende dansk løvtræ, hvid blomstring om foråret.',
+   tasks:{}},
+  {name:'Løn', type:'træ', height:'10-20 m', bloom:'apr', icon:'🍁', desc:'Kendt for flammende efterårsfarver.',
+   tasks:{11:'Fjern faldne blade omkring stammens rodhals'}},
+  {name:'Birk', type:'træ', height:'10-20 m', bloom:'-', icon:'🌳', desc:'Karakteristisk hvid stamme. Følsom over for beskæring om foråret.',
+   tasks:{2:'Undgå beskæring — birk “bløder” ved saftspring, vent til sensommer'}},
+  {name:'Eg', type:'træ', height:'15-25 m', bloom:'-', icon:'🌳', desc:'Langsomtvoksende, meget langlivet og robust dansk løvtræ.',
+   tasks:{}},
+  {name:'Bøg', type:'træ', height:'10-25 m (hæk 1-3 m)', bloom:'-', icon:'🌳', desc:'Populær som både solitærtræ og tæt, vinterbladholdende hæk.',
+   tasks:{8:'Klip hæk inden august er omme'}},
+  {name:'Klematis', type:'busk', height:'2-4 m (klatrer)', bloom:'jun-sep', icon:'🌸', desc:'Klatreplante — beskæringsgruppe afhænger af sorten.',
+   tasks:{2:'Beskær efter sortens gruppe (spørg planteskolen ved køb)',4:'Gød ved vækstsæsonens start'}},
+  {name:'Solsikke', type:'blomst', height:'1-2 m', bloom:'jul-sep', icon:'🌻', desc:'Étårig, hurtig og glad sommerblomst, populær hos bier.',
+   tasks:{5:'Så frø direkte i bedet efter nattefrost',9:'Høst frø til fuglene eller næste år'}},
+  {name:'Georgine', type:'blomst', height:'0,5-1,5 m', bloom:'jul-okt', icon:'🌺', desc:'Knoldplante med righoldig sensommerblomstring i mange farver.',
+   tasks:{5:'Plant knolde ud efter sidste nattefrost',10:'Grav knolde op inden frost og opbevar frostfrit'}},
+  {name:'Jasmin', type:'busk', height:'2-4 m (klatrer)', bloom:'jun-aug', icon:'🤍', desc:'Duftende klatreplante til pergola eller espalier.',
+   tasks:{3:'Beskær udtjente skud for at fremme nye'}},
+  {name:'Kornel', type:'busk', height:'2-3 m', bloom:'maj', icon:'🌿', desc:'Vinterglæde med farvede grene — rød, gul eller orange.',
+   tasks:{3:'Beskær ældre grene helt ned for kraftigere stammefarve næste vinter'}},
+
+  /* ---- Stauder & sommerblomster ---- */
+  {name:'Iris', type:'blomst', height:'0,3-0,9 m', bloom:'maj-jun', icon:'💜', desc:'Staude med markante, kantede blomster. Kan deles hvert 3.-4. år.',
+   tasks:{8:'Del store tuer og genplant',10:'Skær visne blade ned'}},
+  {name:'Daglilje', type:'blomst', height:'0,5-0,9 m', bloom:'jun-aug', icon:'🌼', desc:'Nem og robust staude, hver blomst holder kun en dag.',
+   tasks:{4:'Gød ved vækststart',10:'Skær visne blade ned'}},
+  {name:'Flittiglise', type:'blomst', height:'0,2-0,4 m', bloom:'jun-sep', icon:'🌸', desc:'Étårig skyggeplante med rigelig, lang blomstring.',
+   tasks:{5:'Plantes ud efter sidste nattefrost',9:'Fjern visne planter efter frost'}},
+  {name:'Stedmoderblomst', type:'blomst', height:'0,1-0,2 m', bloom:'mar-okt', icon:'💛', desc:'Hårdfør og blomstrer i næsten alle sæsoner, tåler let frost.',
+   tasks:{3:'Fjern visne blomster løbende for mere blomstring'}},
+  {name:'Krysantemum', type:'blomst', height:'0,3-1 m', bloom:'sep-nov', icon:'🌼', desc:'Efterårets farverige staude, holder til de første nattefroster.',
+   tasks:{4:'Del og genplant tuer',11:'Dæk til med bark inden hård frost'}},
+  {name:'Astilbe', type:'blomst', height:'0,4-1 m', bloom:'jun-jul', icon:'🌸', desc:'Fjerlette blomsterstande, trives i skygge/halvskygge og fugtig jord.',
+   tasks:{4:'Gød ved vækststart',10:'Skær visne stængler ned'}},
+  {name:'Klokkeblomst', type:'blomst', height:'0,2-0,8 m', bloom:'jun-aug', icon:'💙', desc:'Klassisk staude med hængende, klokkeformede blomster.',
+   tasks:{7:'Fjern udblomstrede stængler for genblomstring'}},
+  {name:'Ridderspore', type:'blomst', height:'1-2 m', bloom:'jun-jul', icon:'💙', desc:'Høj staude med imponerende blomstertårne, kræver støtte.',
+   tasks:{3:'Sæt støttepinde op inden væksten tager fart',7:'Skær ned efter blomstring for en ekstra runde'}},
+  {name:'Solhat', type:'blomst', height:'0,6-1,2 m', bloom:'jul-sep', icon:'🌸', desc:'Robust præriestaude (Echinacea/Rudbeckia), elsket af bier og sommerfugle.',
+   tasks:{4:'Gød ved vækststart',10:'Lad frøstande stå til fuglene, skær ned i marts'}},
+  {name:'Kongelys', type:'blomst', height:'1-2 m', bloom:'jun-aug', icon:'💛', desc:'Statelig, sølvgrå staude der selvsår villigt.',
+   tasks:{9:'Lad nogle frøstande stå til selvsåning'}},
+  {name:'Nellike', type:'blomst', height:'0,2-0,4 m', bloom:'jun-aug', icon:'💗', desc:'Duftende og tørketolerant, god til kanter og krukker.',
+   tasks:{7:'Fjern udblomstrede blomster løbende'}},
+  {name:'Morgenfrue', type:'blomst', height:'0,3-0,5 m', bloom:'jun-okt', icon:'🧡', desc:'Étårig, nøjsom og spiselig blomst der selvsår år efter år.',
+   tasks:{5:'Så direkte i bedet',9:'Lad nogle blomster sætte frø til næste år'}},
+  {name:'Kornblomst', type:'blomst', height:'0,3-0,8 m', bloom:'jun-aug', icon:'💙', desc:'Étårig markblomst, nem at så direkte, tiltrækker bestøvere.',
+   tasks:{4:'Så direkte i bedet fra april'}},
+  {name:'Valmue', type:'blomst', height:'0,5-0,9 m', bloom:'maj-jul', icon:'❤️', desc:'Sarte, silkebløde blomster på étårige eller flerårige planter.',
+   tasks:{4:'Så direkte, undgår omplantning'}},
+  {name:'Lupin', type:'blomst', height:'0,6-1,2 m', bloom:'jun-jul', icon:'💜', desc:'Høje blomstertårne, sætter kvælstof i jorden via rødderne.',
+   tasks:{7:'Skær ned efter blomstring for evt. genblomstring'}},
+  {name:'Katost', type:'blomst', height:'0,6-1,5 m', bloom:'jun-sep', icon:'💗', desc:'Staude med lang blomstringsperiode, tiltrækker bier.',
+   tasks:{4:'Gød ved vækststart'}},
+  {name:'Tusindfryd', type:'blomst', height:'0,1-0,15 m', bloom:'apr-okt', icon:'🌼', desc:'Lav og hårdfør bundplante, blomstrer næsten hele året.',
+   tasks:{}},
+  {name:'Krokus', type:'blomst', height:'0,05-0,1 m', bloom:'feb-mar', icon:'💜', desc:'Et af de allerførste forårstegn, løgplante.',
+   tasks:{9:'Plant løg i græsplæne eller bed',5:'Lad blade visne helt inden de fjernes'}},
+  {name:'Vintergæk', type:'blomst', height:'0,1-0,15 m', bloom:'jan-mar', icon:'🤍', desc:'Blomstrer ofte allerede gennem sneen.',
+   tasks:{9:'Plant løg, gerne "i det grønne" lige efter blomstring'}},
+  {name:'Erantis', type:'blomst', height:'0,05-0,1 m', bloom:'feb-mar', icon:'💛', desc:'Tidlig, gul løgplante der spreder sig let i græsset.',
+   tasks:{9:'Plant knolde, udlæg i store grupper'}},
+  {name:'Hyacint', type:'blomst', height:'0,2-0,3 m', bloom:'apr', icon:'💜', desc:'Kraftigt duftende forårsløg i mange farver.',
+   tasks:{10:'Plant løg 10-12 cm dybt',5:'Fjern visne blade når de er gule'}},
+  {name:'Prydløg', type:'blomst', height:'0,3-1,2 m', bloom:'maj-jun', icon:'💜', desc:'Kuglerunde blomsterstande på lange stængler (Allium).',
+   tasks:{10:'Plant løg om efteråret'}},
+  {name:'Gladiolus', type:'blomst', height:'0,6-1,5 m', bloom:'jul-aug', icon:'🌺', desc:'Statelige knoldblomster til bed og buketter.',
+   tasks:{5:'Plant knolde ud efter nattefrost',10:'Grav knolde op og opbevar frostfrit'}},
+  {name:'Liljekonval', type:'blomst', height:'0,15-0,25 m', bloom:'maj', icon:'🤍', desc:'Duftende skyggeplante, spreder sig i tætte tæpper.',
+   tasks:{}},
+  {name:'Judaspenge', type:'blomst', height:'0,5-0,9 m', bloom:'apr-jun', icon:'💜', desc:'Kendt for sine sølvblanke, mønt-lignende frøkapsler.',
+   tasks:{}},
+  {name:'Fingerbøl', type:'blomst', height:'0,9-1,8 m', bloom:'jun-jul', icon:'💗', desc:'Høj, statelig staude/toårig, alle dele giftige.',
+   tasks:{9:'Lad selvså eller så nyt til næste år'}},
+  {name:'Verbena', type:'blomst', height:'0,3-1,2 m', bloom:'jun-sep', icon:'💜', desc:'Luftig sommerblomst, populær hos sommerfugle.',
+   tasks:{5:'Plantes ud efter nattefrost'}},
+  {name:'Zinnia', type:'blomst', height:'0,3-0,9 m', bloom:'jul-sep', icon:'🌺', desc:'Farverig étårig snitblomst, jo mere man klipper, jo mere blomstrer den.',
+   tasks:{5:'Så efter sidste nattefrost',7:'Klip blomster løbende for mere blomstring'}},
+  {name:'Cosmos', type:'blomst', height:'0,6-1,2 m', bloom:'jul-okt', icon:'🌸', desc:'Luftig, nem étårig blomst, tåler magre jorde.',
+   tasks:{5:'Så direkte i bedet i maj'}},
+  {name:'Løvefod', type:'blomst', height:'0,3-0,5 m', bloom:'jun-aug', icon:'💚', desc:'Bunddækkende staude med gulgrønne blomsterskyer, holder på dugdråber.',
+   tasks:{7:'Skær ned efter blomstring for at undgå selvsåning'}},
+  {name:'Storkenæb', type:'blomst', height:'0,2-0,6 m', bloom:'maj-aug', icon:'💗', desc:'Nem og hårdfør bunddækkende staude.',
+   tasks:{7:'Klip tilbage efter første blomstring for ny runde'}},
+
+  /* ---- Buske ---- */
+  {name:'Berberis', type:'busk', height:'1-2,5 m', bloom:'maj', icon:'💛', desc:'Tornet busk, ofte med rødt løv og gule blomster.',
+   tasks:{3:'Beskær efter behov, brug handsker pga. torne'}},
+  {name:'Kvalkved', type:'busk', height:'1,5-4 m', bloom:'maj', icon:'🤍', desc:'Snebold-lignende hvide blomsterbolde (Viburnum).',
+   tasks:{6:'Beskær let efter blomstring'}},
+  {name:'Potentilla', type:'busk', height:'0,5-1 m', bloom:'jun-sep', icon:'💛', desc:'Lav, hårdfør busk med lang blomstringsperiode.',
+   tasks:{3:'Beskær hårdt hvert par år for tæt vækst'}},
+  {name:'Weigela', type:'busk', height:'1-2,5 m', bloom:'maj-jun', icon:'🌸', desc:'Rigtblomstrende busk med trompetformede blomster.',
+   tasks:{6:'Beskær efter blomstring'}},
+  {name:'Deutzia', type:'busk', height:'1-2 m', bloom:'maj-jun', icon:'🤍', desc:'Rigelig hvid eller lyserød blomstring i forsommeren.',
+   tasks:{6:'Beskær efter blomstring'}},
+  {name:'Kristtorn', type:'busk', height:'1-4 m', bloom:'-', icon:'🌿', desc:'Stedsegrøn med blanke, stikkende blade og røde bær om vinteren.',
+   tasks:{4:'Klip i form om foråret'}},
+  {name:'Aronia', type:'busk', height:'1-2 m', bloom:'maj', icon:'⚫', desc:'Hårdfør bærbusk med sorte, sunde bær og flot efterårsfarve.',
+   tasks:{8:'Høst bær',3:'Beskær ældre grene ud'}},
+  {name:'Hyld', type:'busk', height:'2-6 m', bloom:'jun', icon:'🤍', desc:'Duftende blomsterskærme i juni, sorte bær i august.',
+   tasks:{8:'Høst bær og blomster',3:'Beskær for at holde formen'}},
+  {name:'Ribs', type:'busk', height:'1-1,5 m', bloom:'apr', icon:'🔴', desc:'Bærbusk, røde/hvide/sorte klaser i sensommeren.',
+   tasks:{2:'Beskær i frostfri periode',7:'Høst bær'}},
+  {name:'Solbær', type:'busk', height:'1-1,5 m', bloom:'apr', icon:'⚫', desc:'Aromatiske, sorte bær, rig på C-vitamin.',
+   tasks:{2:'Beskær ældre grene ud',7:'Høst bær'}},
+  {name:'Stikkelsbær', type:'busk', height:'1-1,2 m', bloom:'apr', icon:'💚', desc:'Tornet bærbusk, tåler let skygge.',
+   tasks:{2:'Beskær for luft midt i busken',7:'Høst bær'}},
+  {name:'Hindbær', type:'busk', height:'1,5-2 m', bloom:'maj-jun', icon:'🔴', desc:'Opret bærbusk, kræver ofte espalier eller støtte.',
+   tasks:{2:'Skær udgåede skud ned til jorden',8:'Høst løbende'}},
+  {name:'Brombær', type:'busk', height:'2-3 m', bloom:'jun', icon:'⚫', desc:'Kraftigt voksende bærbusk/klatrer, mange sorter er tornfri.',
+   tasks:{2:'Beskær udgåede skud',9:'Høst bær'}},
+  {name:'Bambus', type:'busk', height:'2-4 m', bloom:'-', icon:'🎋', desc:'Stedsegrøn og hurtigtvoksende, vælg en klumpdannende sort for at undgå spredning.',
+   tasks:{4:'Fjern gamle, tørre stængler ved jorden'}},
+  {name:'Liguster', type:'busk', height:'1-3 m', bloom:'jun', icon:'🌿', desc:'Klassisk, tæt hækplante, halvstedsegrøn.',
+   tasks:{6:'Klip hæk første gang',8:'Klip hæk anden gang'}},
+  {name:'Magnolia', type:'busk', height:'2-6 m', bloom:'apr-maj', icon:'🌸', desc:'Iøjnefaldende, store blomster tidligt på foråret, følsom over for nattefrost.',
+   tasks:{3:'Undgå beskæring om foråret, vent til efter blomstring'}},
+  {name:'Kamelia', type:'busk', height:'1-3 m', bloom:'mar-apr', icon:'🌺', desc:'Stedsegrøn med voksagtige blomster, kræver surbundsjord og læ.',
+   tasks:{4:'Gød med surbundsgødning efter blomstring'}},
+  {name:'Azalea', type:'busk', height:'0,5-1,5 m', bloom:'maj', icon:'🌸', desc:'Lav slægtning til rhododendron, kræver sur jord.',
+   tasks:{6:'Fjern udblomstrede blomster',4:'Gød med surbundsgødning'}},
+  {name:'Perlebusk', type:'busk', height:'2-3 m', bloom:'maj', icon:'🤍', desc:'Buet busk med hvide, perlelignende knopper der åbner sig i blomster.',
+   tasks:{6:'Beskær let efter blomstring'}},
+  {name:'Kaprifolium', type:'busk', height:'2-5 m (klatrer)', bloom:'jun-jul', icon:'🧡', desc:'Duftende klatrende slyngplante, blomstrer om aftenen.',
+   tasks:{3:'Beskær udtjente skud'}},
+  {name:'Vedbend', type:'busk', height:'klatrer, ubegrænset', bloom:'-', icon:'🌿', desc:'Stedsegrøn klatreplante, god som bunddække eller på mur.',
+   tasks:{4:'Klip tilbage fra vinduer og tagrender'}},
+  {name:'Blåregn', type:'busk', height:'klatrer, 5-10 m', bloom:'maj', icon:'💜', desc:'Kraftig klatreplante med hængende, duftende blomsterklaser.',
+   tasks:{2:'Beskær sideskud korte for mere blomstring',7:'Beskær sommerskud'}},
+  {name:'Vildvin', type:'busk', height:'klatrer, 10-15 m', bloom:'-', icon:'🍁', desc:'Selvklatrende med flammende røde efterårsblade.',
+   tasks:{3:'Klip tilbage fra vinduer, tag og render'}},
+  {name:'Klatrerose', type:'busk', height:'2-4 m (klatrer)', bloom:'jun-sep', icon:'🌹', desc:'Kraftigtvoksende rose til pergola, hegn eller espalier.',
+   tasks:{3:'Beskær og bind op på støtte',5:'Gød',6:'Fjern udblomstrede blomster'}},
+  {name:'Pilebusk', type:'busk', height:'1-4 m', bloom:'mar', icon:'🌿', desc:'Hurtigtvoksende, ofte brugt til levende hegn eller fletværk.',
+   tasks:{2:'Beskær hårdt for kraftige nye skud'}},
+  {name:'Dværgmispel', type:'busk', height:'0,3-2 m', bloom:'maj-jun', icon:'🔴', desc:'Lav, hårdfør bunddækkende busk med røde bær om efteråret.',
+   tasks:{3:'Beskær efter behov'}},
+  {name:'Benved', type:'busk', height:'1-3 m', bloom:'-', icon:'🌿', desc:'Robust hækplante, tåler klipning godt.',
+   tasks:{6:'Klip hæk'}},
+  {name:'Blåbær', type:'busk', height:'0,3-0,6 m', bloom:'maj', icon:'💙', desc:'Kræver sur jord, giver spiselige bær i sensommeren.',
+   tasks:{4:'Gød med surbundsgødning',8:'Høst bær'}},
+  {name:'Enebær', type:'busk', height:'0,5-2 m', bloom:'-', icon:'🌲', desc:'Stedsegrøn, nøjsom nåleplante, tåler tør og mager jord.',
+   tasks:{}},
+
+  /* ---- Træer ---- */
+  {name:'Kastanje', type:'træ', height:'15-25 m', bloom:'maj', icon:'🌳', desc:'Stort skyggetræ med opretstående, kertelignende blomsterstande.',
+   tasks:{}},
+  {name:'Lind', type:'træ', height:'15-30 m', bloom:'jun', icon:'🌳', desc:'Duftende sommerblomstring, populær hos bier.',
+   tasks:{}},
+  {name:'Ask', type:'træ', height:'20-30 m', bloom:'-', icon:'🌳', desc:'Højt, dansk løvtræ. Vær opmærksom på asketoptørre ved plantning.',
+   tasks:{}},
+  {name:'Elm', type:'træ', height:'20-30 m', bloom:'-', icon:'🌳', desc:'Kraftigt løvtræ, vælg sygdomsresistente sorter pga. elmesyge.',
+   tasks:{}},
+  {name:'Poppel', type:'træ', height:'20-30 m', bloom:'-', icon:'🌳', desc:'Meget hurtigtvoksende, kræver god plads pga. kraftigt rodnet.',
+   tasks:{}},
+  {name:'Rødgran', type:'træ', height:'10-30 m', bloom:'-', icon:'🌲', desc:'Stedsegrøn nåletræ, klassisk juletræ.',
+   tasks:{4:'Formklip nye skud om foråret, hvis ønsket'}},
+  {name:'Skovfyr', type:'træ', height:'10-25 m', bloom:'-', icon:'🌲', desc:'Nøjsomt, stedsegrønt nåletræ med karakteristisk orange bark.',
+   tasks:{}},
+  {name:'Ædelgran', type:'træ', height:'10-30 m', bloom:'-', icon:'🌲', desc:'Stedsegrøn med bløde nåle, populær som juletræ.',
+   tasks:{}},
+  {name:'Grædepil', type:'træ', height:'8-15 m', bloom:'mar', icon:'🌳', desc:'Karakteristiske hængende grene, trives godt ved vand.',
+   tasks:{2:'Beskær i frostfri periode for at holde formen'}},
+  {name:'Røn', type:'træ', height:'6-12 m', bloom:'maj', icon:'🌳', desc:'Hvide blomsterskærme og orange-røde bær, populær hos fugle.',
+   tasks:{9:'Bær kan høstes til gelé'}},
+  {name:'Hassel', type:'træ', height:'3-6 m', bloom:'feb', icon:'🌳', desc:'Blomstrer med gule rakler tidligt, giver hasselnødder om efteråret.',
+   tasks:{9:'Høst nødder',2:'Beskær udtyndende for lys ind i busken'}},
+  {name:'Tjørn', type:'træ', height:'4-8 m', bloom:'maj', icon:'🌸', desc:'Tornet, hårdfør lille træ med hvide blomster og røde bær.',
+   tasks:{}},
+  {name:'Paradisæble', type:'træ', height:'4-6 m', bloom:'maj', icon:'🌸', desc:'Prydæbletræ med rigelig blomstring og dekorative småæbler.',
+   tasks:{3:'Beskær let for luft i kronen'}},
+  {name:'Blommetræ', type:'træ', height:'3-5 m', bloom:'apr', icon:'🌸', desc:'Frugttræ med tidlig forårsblomstring og søde blommer i august.',
+   tasks:{7:'Beskær lige efter høst (undgå sortråd)',8:'Høst blommer'}},
+  {name:'Pæretræ', type:'træ', height:'4-8 m', bloom:'apr-maj', icon:'🌸', desc:'Frugttræ, kræver ofte en anden sort i nærheden for bestøvning.',
+   tasks:{2:'Beskær i frostfri periode',9:'Høst pærer'}},
+  {name:'Valnøddetræ', type:'træ', height:'10-20 m', bloom:'-', icon:'🌳', desc:'Stort, langsomtvoksende træ med spiselige nødder.',
+   tasks:{9:'Høst nødder'}},
+  {name:'Ginkgo', type:'træ', height:'10-25 m', bloom:'-', icon:'🍁', desc:'Levende fossil med karakteristiske vifteformede, gule efterårsblade.',
+   tasks:{}},
+  {name:'Robinie', type:'træ', height:'10-20 m', bloom:'jun', icon:'🤍', desc:'Duftende, hængende blomsterklaser, tåler tør og mager jord.',
+   tasks:{}}
+];
+
+const GENERIC_TASKS = {
+  0:'Planlæg årets have og bestil frø, mens jorden hviler',
+  1:'Beskær frugttræer og prydbuske i frostfrit vejr, inden saftspring',
+  2:'Gød bede og græsplæne, forspir grøntsager indendørs',
+  3:'Så direkte i bedet, fjern vinterdække, luft komposten',
+  4:'Plant sommerblomster ud efter sidste nattefrost',
+  5:'Vand nyplantede planter godt til, luk ukrudt væk mens det er småt',
+  6:'Vand i tørkeperioder, høst tidlige grøntsager og bær',
+  7:'Klip hække, høst løbende, så vintergrønt',
+  8:'Plant efterårsløg, del stauder, så vinterdække-afgrøder',
+  9:'Rag løv sammen (brug det som muld!), plant nye træer og buske',
+  10:'Dæk sarte planter til inden frost, hjemtag potteplanter',
+  11:'Beskyt potter mod frost, rens og olier haveredskaber, planlæg næste sæson'
+};
+
+// ---------- App state ----------
+let currentUser = null;
+let gardenData = { center: null, zoom: null, plants: [] };
+let map = null;
+let markerLayer = null;
+let addressMarkerLayer = null;
+let addMode = false;
+let areaMode = false;
+let drawingPoints = [];
+let previewPolygon = null;
+let pendingPolygon = null;
+let selectedType = 'blomst';
+let pickedDb = null; // db entry chosen while adding a plant
+let editingPlantId = null;
+let pendingLatLng = null;
+let selectedMonth = null; // 0-11
+
+function currentMonthIndex(){ return new Date().getMonth(); }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+// ---------- API helper ----------
+const API_BASE = '/api';
+let authToken = localStorage.getItem('havehjulet_token') || null;
+
+async function apiFetch(path, opts={}){
+  const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  if(authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(API_BASE + path, Object.assign({}, opts, {headers}));
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    const err = new Error((data && data.error) || 'Fejl fra server');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+// ---------- Auth UI ----------
+function switchAuthTab(tab){
+  document.querySelectorAll('.auth-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('login-form').style.display = tab==='login' ? 'block':'none';
+  document.getElementById('register-form').style.display = tab==='register' ? 'block':'none';
+}
+
+function showMsg(id, text, ok){
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'auth-msg show ' + (ok ? 'ok':'error');
+}
+
+async function handleRegister(){
+  const username = document.getElementById('reg-username').value.trim().toLowerCase();
+  const password = document.getElementById('reg-password').value;
+  if(!username || !/^[a-z0-9_-]{2,24}$/.test(username)){
+    showMsg('register-msg','Brugernavn skal være 2-24 tegn (bogstaver, tal, - og _).', false); return;
+  }
+  if(password.length < 4){
+    showMsg('register-msg','Adgangskoden skal være mindst 4 tegn.', false); return;
+  }
+  try{
+    await apiFetch('/register', {method:'POST', body: JSON.stringify({username, password})});
+    showMsg('register-msg','Konto oprettet! Du kan nu logge ind.', true);
+    document.getElementById('reg-password').value='';
+    setTimeout(()=>{ switchAuthTab('login'); document.getElementById('login-username').value = username; }, 700);
+  }catch(e){
+    showMsg('register-msg', e.message || 'Der gik noget galt. Prøv igen.', false);
+  }
+}
+
+async function handleLogin(){
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
+  if(!username || !password){ showMsg('login-msg','Udfyld begge felter.', false); return; }
+  try{
+    const data = await apiFetch('/login', {method:'POST', body: JSON.stringify({username, password})});
+    authToken = data.token;
+    localStorage.setItem('havehjulet_token', authToken);
+    currentUser = username;
+    await loadGarden();
+    enterApp();
+  }catch(e){
+    showMsg('login-msg', e.message || 'Der gik noget galt. Prøv igen.', false);
+  }
+}
+
+function handleLogout(){
+  currentUser = null;
+  authToken = null;
+  localStorage.removeItem('havehjulet_token');
+  gardenData = { center:null, zoom:null, plants:[] };
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('login-password').value='';
+}
+
+async function loadGarden(){
+  try{
+    const data = await apiFetch('/garden');
+    gardenData = data.garden || {center:null, zoom:null, plants:[], addresses:[]};
+  }catch(e){
+    gardenData = {center:null, zoom:null, plants:[], addresses:[]};
+  }
+  if(!gardenData.plants) gardenData.plants = [];
+  if(!gardenData.addresses) gardenData.addresses = [];
+}
+
+async function saveGarden(){
+  try{
+    await apiFetch('/garden', {method:'PUT', body: JSON.stringify({garden: gardenData})});
+  }catch(e){
+    toast('Kunne ikke gemme — prøv igen');
+  }
+}
+
+// try to restore a session on page load
+async function tryAutoLogin(){
+  if(!authToken) return;
+  try{
+    const me = await apiFetch('/me');
+    currentUser = me.username;
+    await loadGarden();
+    enterApp();
+  }catch(e){
+    authToken = null;
+    localStorage.removeItem('havehjulet_token');
+  }
+}
+
+// ---------- Enter app ----------
+function enterApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-shell').style.display='flex';
+  document.getElementById('user-pill').textContent = '@' + currentUser;
+  buildYearWheel();
+  selectMonth(currentMonthIndex(), true);
+  document.getElementById('today-label').textContent = new Date().toLocaleDateString('da-DK', {day:'numeric', month:'long', year:'numeric'});
+  initMapIfNeeded();
+  renderJournal();
+  renderAddressList();
+}
+
+function switchView(view){
+  document.getElementById('tab-dash').classList.toggle('active', view==='dash');
+  document.getElementById('tab-map').classList.toggle('active', view==='map');
+  document.getElementById('view-dash').classList.toggle('active', view==='dash');
+  document.getElementById('view-map').classList.toggle('active', view==='map');
+  if(view==='map'){
+    initMapIfNeeded();
+    setTimeout(()=>{ if(map) map.invalidateSize(); }, 60);
+  }
+}
+
+// ---------- Year wheel ----------
+function polarToCartesian(cx, cy, r, angleDeg){
+  const a = (angleDeg-90) * Math.PI/180;
+  return { x: cx + r*Math.cos(a), y: cy + r*Math.sin(a) };
+}
+function describeWedge(cx, cy, rOuter, rInner, startAngle, endAngle){
+  const p1 = polarToCartesian(cx, cy, rOuter, endAngle);
+  const p2 = polarToCartesian(cx, cy, rOuter, startAngle);
+  const p3 = polarToCartesian(cx, cy, rInner, startAngle);
+  const p4 = polarToCartesian(cx, cy, rInner, endAngle);
+  const largeArc = endAngle-startAngle <= 180 ? 0 : 1;
+  return [
+    'M', p1.x, p1.y,
+    'A', rOuter, rOuter, 0, largeArc, 0, p2.x, p2.y,
+    'L', p3.x, p3.y,
+    'A', rInner, rInner, 0, largeArc, 1, p4.x, p4.y,
+    'Z'
+  ].join(' ');
+}
+
+function monthPlantCount(m){
+  return gardenData.plants.filter(p => p.tasks && p.tasks[m]).length;
+}
+
+function buildYearWheel(){
+  const svg = document.getElementById('year-wheel');
+  const cx=250, cy=250, rOuter=225, rInner=118;
+  let html = '';
+  for(let i=0;i<12;i++){
+    const start = i*30, end = (i+1)*30;
+    const path = describeWedge(cx, cy, rOuter, rInner, start, end);
+    const color = seasonForMonth(i);
+    const mid = polarToCartesian(cx, cy, (rOuter+rInner)/2 + 6, start+15);
+    const labelPos = polarToCartesian(cx, cy, rOuter-24, start+15);
+    const count = monthPlantCount(i);
+    html += `<g class="wedge" data-month="${i}" onclick="selectMonth(${i}, false)">
+      <path d="${path}" fill="${color}" fill-opacity="0.88" stroke="#f4efdd" stroke-width="2.5"></path>
+      <text x="${labelPos.x}" y="${labelPos.y}" text-anchor="middle" dominant-baseline="middle" class="wedge-label" font-size="14" fill="#fffdf6">${MONTHS[i]}</text>
+      ${count>0 ? `<circle cx="${mid.x}" cy="${mid.y}" r="9" fill="#fffdf6"></circle><text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" class="wedge-count mono" font-size="10" fill="#2a2620" font-weight="700">${count}</text>` : ''}
+    </g>`;
+  }
+  // center
+  html += `<circle cx="${cx}" cy="${cy}" r="${rInner-6}" fill="#f4efdd" stroke="#ddd0a8" stroke-width="1"></circle>
+    <text x="${cx}" y="${cy-8}" text-anchor="middle" class="wheel-center-label" font-size="17" fill="#28402c">Årshjul</text>
+    <text x="${cx}" y="${cy+14}" text-anchor="middle" class="mono" font-size="10.5" fill="#4a3b2a" opacity="0.7">Klik en måned</text>`;
+  svg.innerHTML = html;
+  highlightMonth(selectedMonth);
+}
+
+function highlightMonth(m){
+  document.querySelectorAll('#year-wheel .wedge').forEach(w=>{
+    const wm = parseInt(w.dataset.month);
+    if(wm===m){
+      w.style.transform='scale(1.045)';
+      w.querySelector('path').setAttribute('stroke', '#28402c');
+      w.querySelector('path').setAttribute('stroke-width', '3.5');
+    } else {
+      w.style.transform='scale(1)';
+      w.querySelector('path').setAttribute('stroke', '#f4efdd');
+      w.querySelector('path').setAttribute('stroke-width', '2.5');
+    }
+  });
+}
+
+function selectMonth(m, isToday){
+  selectedMonth = m;
+  highlightMonth(m);
+  const panelName = document.getElementById('panel-month-name');
+  const panelSub = document.getElementById('panel-month-sub');
+  panelName.textContent = MONTHS_FULL[m].charAt(0).toUpperCase()+MONTHS_FULL[m].slice(1);
+  panelSub.textContent = isToday ? 'Denne måned' : 'Opgaver';
+
+  const plantTasks = gardenData.plants.filter(p => p.tasks && p.tasks[m]);
+  let html = '';
+
+  if(plantTasks.length){
+    html += `<div class="task-group"><h4>Dine planter</h4>`;
+    plantTasks.forEach(p=>{
+      html += `<div class="task-item"><div class="icon">${p.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(p.name)}</b> — ${escapeHtml(p.tasks[m])}</div></div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="task-group"><h4>Dine planter</h4><div class="empty-note">Ingen af dine registrerede planter har opgaver denne måned.</div></div>`;
+  }
+
+  html += `<div class="task-group"><h4>Generelt i haven</h4>
+    <div class="task-item"><div class="icon">🪴</div><div class="txt">${escapeHtml(GENERIC_TASKS[m])}</div></div>
+  </div>`;
+
+  document.getElementById('panel-content').innerHTML = html;
+}
+
+// ---------- hero month strip ----------
+(function initHeroStrip(){
+  const wrap = document.getElementById('hero-month-strip');
+  const cm = new Date().getMonth();
+  wrap.innerHTML = MONTHS.map((m,i)=>`<span class="month-chip ${i===cm?'active':''}">${m}</span>`).join('');
+})();
+
+// ---------- Map ----------
+function initMapIfNeeded(){
+  if(map) return;
+  map = L.map('map', { zoomControl:true }).setView(
+    gardenData.center ? [gardenData.center.lat, gardenData.center.lng] : [56.1629, 10.2039],
+    gardenData.zoom || 6
+  );
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, attribution: 'Tiles &copy; Esri'
+  }).addTo(map);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, opacity:0.9
+  }).addTo(map);
+
+  markerLayer = L.layerGroup().addTo(map);
+  addressMarkerLayer = L.layerGroup().addTo(map);
+  renderMarkers();
+  renderAddressMarkers();
+
+  map.on('click', (e)=>{
+    if(addMode){
+      pendingLatLng = e.latlng;
+      openAddModal();
+      return;
+    }
+    if(areaMode){
+      addAreaPoint(e.latlng);
+    }
+  });
+
+  map.on('moveend', ()=>{
+    gardenData.center = map.getCenter();
+    gardenData.zoom = map.getZoom();
+    saveGarden();
+  });
+}
+
+function toggleAddMode(){
+  addMode = !addMode;
+  if(addMode) resetAreaDrawing();
+  document.getElementById('add-toggle-btn').classList.toggle('active', addMode);
+  document.getElementById('add-mode-banner').classList.toggle('show', addMode);
+}
+
+// ---------- Area (bed) drawing ----------
+function toggleAreaMode(){
+  areaMode = !areaMode;
+  if(areaMode){
+    addMode = false;
+    document.getElementById('add-toggle-btn').classList.remove('active');
+    document.getElementById('add-mode-banner').classList.remove('show');
+  } else {
+    resetAreaDrawing();
+  }
+  document.getElementById('area-toggle-btn').classList.toggle('active', areaMode);
+  document.getElementById('area-mode-banner').classList.toggle('show', areaMode);
+  updateAreaBanner();
+}
+
+function resetAreaDrawing(){
+  areaMode = false;
+  drawingPoints = [];
+  if(previewPolygon){ map && map.removeLayer(previewPolygon); previewPolygon = null; }
+  const btn = document.getElementById('area-toggle-btn');
+  const banner = document.getElementById('area-mode-banner');
+  if(btn) btn.classList.remove('active');
+  if(banner) banner.classList.remove('show');
+}
+
+function addAreaPoint(latlng){
+  drawingPoints.push(latlng);
+  if(previewPolygon){ map.removeLayer(previewPolygon); previewPolygon = null; }
+  if(drawingPoints.length>=2){
+    previewPolygon = L.polygon(drawingPoints, { color:'#d9a441', weight:2, fillColor:'#d9a441', fillOpacity:0.22, dashArray:'6,5' }).addTo(map);
+  } else {
+    previewPolygon = L.circleMarker(drawingPoints[0], { radius:5, color:'#d9a441', fillColor:'#d9a441', fillOpacity:1 }).addTo(map);
+  }
+  updateAreaBanner();
+}
+
+function updateAreaBanner(){
+  const banner = document.getElementById('area-mode-banner');
+  if(!banner) return;
+  const n = drawingPoints.length;
+  let txt = n===0 ? 'Klik på kortet for at sætte det første hjørne af bedet ▱' : `Klik for flere hjørner (${n} sat)`;
+  let btns = `<button class="mini-btn cancel" onclick="cancelAreaDrawing()">✕ Annullér</button>`;
+  if(n>=3){
+    btns = `<button class="mini-btn finish" onclick="finishAreaDrawing()">✓ Afslut bed</button>` + btns;
+  }
+  banner.innerHTML = `${txt}${btns}`;
+}
+
+function cancelAreaDrawing(){
+  resetAreaDrawing();
+}
+
+function finishAreaDrawing(){
+  if(drawingPoints.length < 3){ toast('Tegn mindst 3 hjørner først'); return; }
+  pendingPolygon = drawingPoints.map(p=>({lat:p.lat, lng:p.lng}));
+  pendingLatLng = null;
+  areaMode = false;
+  document.getElementById('area-toggle-btn').classList.remove('active');
+  document.getElementById('area-mode-banner').classList.remove('show');
+  openAddModal();
+}
+
+async function searchAddress(){
+  const q = document.getElementById('addr-input').value.trim();
+  const box = document.getElementById('addr-suggestions');
+  if(!q){ box.innerHTML=''; return; }
+  box.innerHTML = '<div style="opacity:0.6;">Søger…</div>';
+  try{
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&q=' + encodeURIComponent(q));
+    const data = await res.json();
+    if(!data.length){ box.innerHTML = '<div style="opacity:0.6;">Ingen resultater</div>'; return; }
+    box.innerHTML = data.map((d,i)=>`<div onclick="pickAddress(${i})">${escapeHtml(d.display_name)}</div>`).join('');
+    window._addrResults = data;
+  }catch(e){
+    box.innerHTML = '<div style="opacity:0.6;">Søgningen fejlede — prøv igen</div>';
+  }
+}
+function pickAddress(i){
+  const d = window._addrResults[i];
+  document.getElementById('addr-suggestions').innerHTML='';
+  document.getElementById('addr-input').value = d.display_name;
+  map.setView([parseFloat(d.lat), parseFloat(d.lon)], 19);
+  gardenData.center = {lat: parseFloat(d.lat), lng: parseFloat(d.lon)};
+  gardenData.zoom = 19;
+  saveGarden();
+}
+
+function makeDivIcon(plant){
+  const color = TYPE_COLOR[plant.type] || '#5b8c4a';
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:34px;height:34px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.35);border:2px solid #fffdf6;">
+            <span style="transform:rotate(45deg);font-size:15px;">${plant.icon||'🌱'}</span>
+          </div>`,
+    iconSize:[34,34], iconAnchor:[17,32]
+  });
+}
+
+function renderMarkers(){
+  if(!markerLayer) return;
+  markerLayer.clearLayers();
+  gardenData.plants.forEach(p=>{
+    const tipHtml = `<div class="tip-inner">
+        <div class="tip-img">${p.image ? `<img src="${escapeAttr(p.image)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">` : (p.icon||'🌱')}</div>
+        <b>${escapeHtml(p.name)}</b>
+        <div class="tip-meta">${TYPE_LABEL[p.type]||''}${p.polygon?' · bed':''}${p.height? ' · '+escapeHtml(p.height):''}${p.bloom && p.bloom!=='-' ? '<br>Blomstrer: '+escapeHtml(p.bloom):''}</div>
+      </div>`;
+
+    if(p.polygon && p.polygon.length>=3){
+      const color = TYPE_COLOR[p.type] || '#5b8c4a';
+      const latlngs = p.polygon.map(pt=>[pt.lat, pt.lng]);
+      const poly = L.polygon(latlngs, { color, weight:2, fillColor:color, fillOpacity:0.32 });
+      poly.bindTooltip(tipHtml, {className:'plant-tip', direction:'top'});
+      poly.on('click', ()=> openDetail(p.id));
+      poly.addTo(markerLayer);
+
+      const labelIcon = L.divIcon({
+        className:'',
+        html:`<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#fffdf6ee;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;color:${color};box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">${p.icon||'🌱'} ${escapeHtml(p.name)}</div>`,
+        iconSize:[0,0]
+      });
+      L.marker([p.lat, p.lng], { icon: labelIcon, interactive:false }).addTo(markerLayer);
+    } else {
+      const marker = L.marker([p.lat, p.lng], { icon: makeDivIcon(p) });
+      marker.bindTooltip(tipHtml, {className:'plant-tip', direction:'top', offset:[0,-28]});
+      marker.on('click', ()=> openDetail(p.id));
+      marker.addTo(markerLayer);
+    }
+  });
+}
+
+// ---------- Journal ----------
+function renderJournal(){
+  const q = (document.getElementById('journal-search')?.value || '').toLowerCase();
+  const list = document.getElementById('journal-list');
+  const items = gardenData.plants.filter(p => p.name.toLowerCase().includes(q));
+  if(!items.length){
+    list.innerHTML = `<div class="journal-empty">${gardenData.plants.length? 'Ingen planter matcher din søgning.' : 'Du har ikke registreret nogen planter endnu. Find din adresse på kortet, tryk “Tilføj plante”, og klik hvor den står.'}</div>`;
+    return;
+  }
+  list.innerHTML = items.map(p=>`
+    <div class="journal-item" onclick="flyToPlant('${p.id}')">
+      <div class="ico" style="background:${TYPE_COLOR[p.type]}22;">${p.icon||'🌱'}</div>
+      <div class="info"><b>${escapeHtml(p.name)}</b><span>${TYPE_LABEL[p.type]||''}</span></div>
+    </div>`).join('');
+}
+
+function flyToPlant(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p) return;
+  switchView('map');
+  setTimeout(()=>{
+    if(p.polygon && p.polygon.length>=3){
+      const bounds = L.latLngBounds(p.polygon.map(pt=>[pt.lat, pt.lng]));
+      map.fitBounds(bounds, {padding:[60,60], maxZoom:21, animate:true});
+    } else {
+      map.setView([p.lat, p.lng], 20, {animate:true});
+    }
+    openDetail(id);
+  }, 150);
+}
+
+// ---------- Addresses ----------
+function renderAddressList(){
+  const list = document.getElementById('address-list');
+  if(!list) return;
+  if(!gardenData.addresses || !gardenData.addresses.length){
+    list.innerHTML = `<div class="address-empty">Ingen gemte adresser endnu. Søg din adresse på kortet, og tryk “Gem adresse”.</div>`;
+    return;
+  }
+  list.innerHTML = gardenData.addresses.map(a=>`
+    <div class="address-item" onclick="flyToAddress('${a.id}')">
+      <div class="ico">📍</div>
+      <b>${escapeHtml(a.name)}</b>
+      <button class="del-addr" onclick="event.stopPropagation();deleteAddress('${a.id}')" title="Slet">✕</button>
+    </div>`).join('');
+}
+
+function renderAddressMarkers(){
+  if(!addressMarkerLayer) return;
+  addressMarkerLayer.clearLayers();
+  (gardenData.addresses||[]).forEach(a=>{
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:var(--gold,#d9a441);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.35);border:2px solid #fffdf6;">
+              <span style="transform:rotate(45deg);font-size:13px;">🏠</span>
+            </div>`,
+      iconSize:[30,30], iconAnchor:[15,28]
+    });
+    const marker = L.marker([a.lat, a.lng], { icon });
+    marker.bindTooltip(`<div class="tip-inner"><b>${escapeHtml(a.name)}</b></div>`, {className:'plant-tip', direction:'top', offset:[0,-24]});
+    marker.addTo(addressMarkerLayer);
+  });
+}
+
+function openAddressModal(){
+  const c = map ? map.getCenter() : null;
+  document.getElementById('address-name').value = '';
+  document.getElementById('address-display').value = document.getElementById('addr-input').value || (c ? `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}` : '');
+  document.getElementById('address-modal').classList.add('show');
+}
+
+function saveAddress(){
+  const name = document.getElementById('address-name').value.trim();
+  if(!name){ toast('Giv adressen et navn'); return; }
+  if(!map){ toast('Kortet er ikke klar endnu'); return; }
+  const c = map.getCenter();
+  const addr = {
+    id: 'a'+Date.now()+Math.random().toString(36).slice(2,7),
+    name,
+    lat: c.lat,
+    lng: c.lng,
+    zoom: map.getZoom(),
+    display: document.getElementById('address-display').value
+  };
+  if(!gardenData.addresses) gardenData.addresses = [];
+  gardenData.addresses.push(addr);
+  saveGarden();
+  renderAddressList();
+  renderAddressMarkers();
+  closeModal('address-modal');
+  toast('Adresse gemt 📍');
+}
+
+function flyToAddress(id){
+  const a = (gardenData.addresses||[]).find(x=>x.id===id);
+  if(!a) return;
+  switchView('map');
+  setTimeout(()=>{
+    map.setView([a.lat, a.lng], a.zoom || 19, {animate:true});
+  }, 150);
+}
+
+function deleteAddress(id){
+  gardenData.addresses = (gardenData.addresses||[]).filter(a=>a.id!==id);
+  saveGarden();
+  renderAddressList();
+  renderAddressMarkers();
+  toast('Adresse slettet');
+}
+
+// ---------- Add plant modal ----------
+function openAddModal(){
+  editingPlantId = null;
+  pickedDb = null;
+  selectedType = 'blomst';
+  document.getElementById('add-modal-title').textContent = pendingPolygon ? 'Nyt bed' : 'Ny plante';
+  document.getElementById('type-choice').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.type==='blomst'));
+  document.getElementById('db-search').value='';
+  document.getElementById('db-results').classList.remove('show');
+  document.getElementById('db-picked-box').innerHTML='';
+  document.getElementById('plant-name').value='';
+  document.getElementById('plant-height').value='';
+  document.getElementById('plant-bloom').value='';
+  document.getElementById('plant-image').value='';
+  document.getElementById('plant-notes').value='';
+  document.getElementById('add-modal').classList.add('show');
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(id==='add-modal'){
+    addMode=false;
+    document.getElementById('add-toggle-btn').classList.remove('active');
+    document.getElementById('add-mode-banner').classList.remove('show');
+    pendingPolygon = null;
+    resetAreaDrawing();
+  }
+}
+function pickType(t){
+  selectedType = t;
+  document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===t));
+}
+let dbSearchTimer = null;
+
+function filterDb(){
+  const q = document.getElementById('db-search').value.trim().toLowerCase();
+  const box = document.getElementById('db-results');
+  if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
+
+  const localMatches = PLANT_DB.filter(p=>p.name.toLowerCase().includes(q)).slice(0,6);
+  onlineStates.gbif = null;
+  renderDbResults(localMatches, null, null);
+  box.classList.add('show');
+
+  clearTimeout(dbSearchTimer);
+  if(q.length < 2) return;
+  dbSearchTimer = setTimeout(()=>{
+    searchGbif(q, localMatches);
+    searchOnline(q, localMatches, 'perenual', '/plants/search', '/plants/details/', pickExternal);
+    searchOnline(q, localMatches, 'trefle', '/trefle/search', '/trefle/details/', pickTrefle);
+  }, 450);
+}
+
+let onlineStates = { gbif: null, perenual: null, trefle: null };
+
+function renderOnlineSection(label, state, onPick){
+  let html = `<div style="padding:8px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">${label}</div>`;
+  if(state==='loading'){
+    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Søger…</div>`;
+  } else if(state==='error'){
+    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Utilgængelig lige nu</div>`;
+  } else if(Array.isArray(state)){
+    if(!state.length){
+      html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen resultater</div>`;
+    } else {
+      html += state.map(r=>`<div class="db-result-item" onclick="${onPick}(${r.id})">
+          ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" style="width:22px;height:22px;object-fit:cover;border-radius:5px;">` : `<span>🌱</span>`}
+          <span>${escapeHtml(r.common_name)} <span style="opacity:0.55;font-size:11px;font-style:italic;">${r.scientific ? escapeHtml(r.scientific) : ''}</span></span>
+        </div>`).join('');
+    }
+  } else {
+    html += `<div class="db-result-item" style="opacity:0.5;cursor:default;">Skriv mindst 2 tegn…</div>`;
+  }
+  return html;
+}
+
+function renderDbResults(localMatches, perenualState, trefleState){
+  if(perenualState !== undefined) onlineStates.perenual = perenualState;
+  if(trefleState !== undefined) onlineStates.trefle = trefleState;
+  const box = document.getElementById('db-results');
+  let html = '';
+  if(localMatches.length){
+    html += `<div style="padding:6px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">Fra biblioteket</div>`;
+    html += localMatches.map(p=>`<div class="db-result-item" onclick="pickDb('${p.name.replace(/'/g,"\\'")}')"><span>${p.icon}</span><span>${escapeHtml(p.name)} <span style="opacity:0.55;font-size:11.5px;">· ${TYPE_LABEL[p.type]}</span></span></div>`).join('');
+  } else if(onlineStates.perenual===null){
+    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen match i biblioteket</div>`;
+  }
+
+  html += renderOnlineSection('Dansk navn → latin (GBIF)', onlineStates.gbif, 'pickGbif');
+  html += renderOnlineSection('Søg online — Perenual', onlineStates.perenual, 'pickExternal');
+  html += renderOnlineSection('Søg online — Trefle', onlineStates.trefle, 'pickTrefle');
+
+  box.innerHTML = html;
+}
+
+async function searchGbif(q, localMatches){
+  onlineStates.gbif = 'loading';
+  renderDbResults(localMatches, undefined, undefined);
+  try{
+    const url = `https://api.gbif.org/v1/species/search?q=${encodeURIComponent(q)}&language=dan&kingdom=Plantae&status=ACCEPTED&limit=15`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('bad response');
+    const data = await r.json();
+    const seen = new Set();
+    const results = (data.results||[]).filter(d=>{
+      const name = d.canonicalName || d.scientificName;
+      if(!name || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    }).slice(0,15).map(d=>({
+      id: d.key,
+      vernacular: d.vernacularName || null,
+      scientific: d.canonicalName || d.scientificName,
+      common_name: d.vernacularName || d.canonicalName || d.scientificName,
+      thumb: null
+    }));
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates.gbif = results;
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }catch(e){
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates.gbif = 'error';
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }
+}
+
+function pickGbif(key){
+  const item = (Array.isArray(onlineStates.gbif) ? onlineStates.gbif : []).find(r=>r.id===key);
+  if(!item) return;
+  if(item.vernacular){
+    document.getElementById('plant-name').value = item.vernacular;
+  }
+  toast(`Fundet: ${item.scientific} — søger nu Perenual/Trefle for pasningsinfo…`);
+  document.getElementById('db-search').value = item.scientific;
+  filterDb();
+}
+
+async function searchOnline(q, localMatches, key, searchPath, detailsPathPrefix, pickFn){
+  onlineStates[key] = 'loading';
+  renderDbResults(localMatches, undefined, undefined);
+  try{
+    const data = await apiFetch(`${searchPath}?q=${encodeURIComponent(q)}`);
+    const results = (data.data||[]).slice(0,25).map(d=>({
+      id:d.id,
+      common_name:d.common_name || (d.scientific_name && (Array.isArray(d.scientific_name)?d.scientific_name[0]:d.scientific_name)) || 'Ukendt navn',
+      scientific: Array.isArray(d.scientific_name) ? d.scientific_name[0] : d.scientific_name,
+      thumb: d.default_image ? (d.default_image.thumbnail || d.default_image.small_url) : (d.image_url || null)
+    }));
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates[key] = results;
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }catch(e){
+    if(document.getElementById('db-search').value.trim().toLowerCase()===q){
+      onlineStates[key] = 'error';
+      renderDbResults(localMatches, undefined, undefined);
+    }
+  }
+}
+
+const ENGLISH_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+async function pickExternal(id){
+  const box = document.getElementById('db-results');
+  box.innerHTML = `<div class="db-result-item" style="opacity:0.6;cursor:default;">Henter detaljer…</div>`;
+  try{
+    const d = await apiFetch(`/plants/details/${id}`);
+
+    // guess type
+    let type = 'blomst';
+    const t = (d.type||'').toLowerCase();
+    if(t.includes('tree')) type = 'træ';
+    else if(t.includes('shrub') || t.includes('bush') || t.includes('vine') || t.includes('climb')) type = 'busk';
+
+    // height / dimension
+    let height = '—';
+    const dim = Array.isArray(d.dimension) ? d.dimension[0] : d.dimension;
+    if(dim && (dim.min_value || dim.max_value)){
+      height = `${dim.min_value||'?'}-${dim.max_value||'?'} ${dim.unit||''}`.trim();
+    } else if(typeof d.dimension === 'string' && d.dimension){
+      height = d.dimension;
+    }
+
+    const bloom = d.flowering_season || (d.flowers ? 'Blomstrer (sæson ukendt)' : '-');
+
+    // build tasks from pruning_month
+    const tasks = {};
+    if(Array.isArray(d.pruning_month)){
+      d.pruning_month.forEach(mName=>{
+        const idx = ENGLISH_MONTHS.indexOf(String(mName).toLowerCase());
+        if(idx>-1) tasks[idx] = 'Beskær';
+      });
+    }
+
+    const descParts = [];
+    if(d.watering) descParts.push('Vanding: ' + d.watering);
+    if(Array.isArray(d.sunlight) && d.sunlight.length) descParts.push('Lys: ' + d.sunlight.join(', '));
+    if(d.maintenance) descParts.push('Vedligehold: ' + d.maintenance);
+    const desc = descParts.join('. ') || (d.description ? String(d.description).slice(0,220) : 'Hentet fra Perenual plantedatabase.');
+
+    const image = d.default_image ? (d.default_image.medium_url || d.default_image.regular_url || d.default_image.small_url) : '';
+
+    pickedDb = {
+      name: d.common_name || (d.scientific_name && d.scientific_name[0]) || 'Ukendt plante',
+      type, height, bloom, desc, tasks,
+      icon: type==='træ' ? '🌳' : type==='busk' ? '🌿' : '🌸'
+    };
+    selectedType = type;
+    document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
+    document.getElementById('plant-name').value = pickedDb.name;
+    document.getElementById('plant-height').value = height==='—' ? '' : height;
+    document.getElementById('plant-bloom').value = bloom==='-' ? '' : bloom;
+    if(image) document.getElementById('plant-image').value = image;
+    document.getElementById('db-results').classList.remove('show');
+    document.getElementById('db-search').value='';
+    document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+    toast('Data hentet fra Perenual');
+  }catch(e){
+    toast('Kunne ikke hente detaljer — prøv igen');
+    box.classList.remove('show');
+  }
+}
+
+const TREFLE_MONTH_ABBR = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+async function pickTrefle(id){
+  const box = document.getElementById('db-results');
+  box.innerHTML = `<div class="db-result-item" style="opacity:0.6;cursor:default;">Henter detaljer…</div>`;
+  try{
+    const res = await apiFetch(`/trefle/details/${id}`);
+    const d = (res && res.data) ? res.data : res;
+    const sp = d.main_species || {};
+    const growth = sp.growth || {};
+
+    // guess type from family/name — Trefle rarely states this explicitly
+    let type = 'blomst';
+    const t = ((d.family || '') + ' ' + (d.common_name || '')).toLowerCase();
+    if(t.includes('tree') || t.includes('træ')) type = 'træ';
+    else if(t.includes('shrub') || t.includes('bush') || t.includes('vine')) type = 'busk';
+
+    let height = '—';
+    if(growth.spread && (growth.spread.cm || growth.spread.min || growth.spread.max)){
+      const sp2 = growth.spread;
+      height = sp2.cm ? `${sp2.cm} cm` : `${sp2.min||'?'}-${sp2.max||'?'} ${sp2.unit||'cm'}`;
+    }
+
+    let bloom = '-';
+    if(Array.isArray(growth.bloom_months) && growth.bloom_months.length){
+      bloom = growth.bloom_months.map(m=>String(m).slice(0,3)).join(', ');
+    }
+
+    const tasks = {};
+    if(Array.isArray(growth.bloom_months)){
+      growth.bloom_months.forEach(mAbbr=>{
+        const idx = TREFLE_MONTH_ABBR.indexOf(String(mAbbr).toLowerCase().slice(0,3));
+        if(idx>-1) tasks[idx] = 'Blomstrer';
+      });
+    }
+
+    const descParts = [];
+    if(growth.light) descParts.push('Lysbehov (0-10): ' + growth.light);
+    if(growth.atmospheric_humidity) descParts.push('Luftfugtighed (0-10): ' + growth.atmospheric_humidity);
+    if(growth.minimum_temperature && growth.minimum_temperature.deg_c != null) descParts.push('Min. temp: ' + growth.minimum_temperature.deg_c + '°C');
+    const desc = descParts.join('. ') || 'Hentet fra Trefle plantedatabase.';
+
+    const image = d.image_url || (sp.images && sp.images.flower && sp.images.flower[0] && sp.images.flower[0].image_url) || '';
+
+    pickedDb = {
+      name: d.common_name || d.scientific_name || 'Ukendt plante',
+      type, height, bloom, desc, tasks,
+      icon: type==='træ' ? '🌳' : type==='busk' ? '🌿' : '🌸'
+    };
+    selectedType = type;
+    document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
+    document.getElementById('plant-name').value = pickedDb.name;
+    document.getElementById('plant-height').value = height==='—' ? '' : height;
+    document.getElementById('plant-bloom').value = bloom==='-' ? '' : bloom;
+    if(image) document.getElementById('plant-image').value = image;
+    document.getElementById('db-results').classList.remove('show');
+    document.getElementById('db-search').value='';
+    document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+    toast('Data hentet fra Trefle');
+  }catch(e){
+    toast('Kunne ikke hente detaljer — prøv igen');
+    box.classList.remove('show');
+  }
+}
+
+function pickDb(name){
+  const p = PLANT_DB.find(x=>x.name===name);
+  if(!p) return;
+  pickedDb = p;
+  selectedType = p.type;
+  document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===p.type));
+  document.getElementById('plant-name').value = p.name;
+  document.getElementById('plant-height').value = p.height;
+  document.getElementById('plant-bloom').value = p.bloom;
+  document.getElementById('db-results').classList.remove('show');
+  document.getElementById('db-search').value='';
+  document.getElementById('db-picked-box').innerHTML = `<div class="db-picked"><span style="font-size:20px;">${p.icon}</span><span>Bruger data fra biblioteket: <b>${escapeHtml(p.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+}
+function clearDbPick(){
+  pickedDb = null;
+  document.getElementById('db-picked-box').innerHTML='';
+}
+
+function savePlant(){
+  const name = document.getElementById('plant-name').value.trim();
+  if(!name){ toast('Giv planten et navn'); return; }
+
+  const existing = editingPlantId ? gardenData.plants.find(p=>p.id===editingPlantId) : null;
+  let polygon = null, lat, lng;
+
+  if(pendingPolygon && pendingPolygon.length>=3){
+    polygon = pendingPolygon;
+    lat = polygon.reduce((s,p)=>s+p.lat,0)/polygon.length;
+    lng = polygon.reduce((s,p)=>s+p.lng,0)/polygon.length;
+  } else if(existing){
+    polygon = existing.polygon || null;
+    lat = pendingLatLng ? pendingLatLng.lat : existing.lat;
+    lng = pendingLatLng ? pendingLatLng.lng : existing.lng;
+  } else {
+    lat = pendingLatLng ? pendingLatLng.lat : gardenData.center?.lat;
+    lng = pendingLatLng ? pendingLatLng.lng : gardenData.center?.lng;
+  }
+
+  const plant = {
+    id: editingPlantId || ('p'+Date.now()+Math.random().toString(36).slice(2,7)),
+    lat, lng, polygon,
+    type: selectedType,
+    name: name,
+    height: document.getElementById('plant-height').value.trim(),
+    bloom: document.getElementById('plant-bloom').value.trim(),
+    image: document.getElementById('plant-image').value.trim(),
+    notes: document.getElementById('plant-notes').value.trim(),
+    icon: pickedDb ? pickedDb.icon : (selectedType==='blomst'?'🌸':selectedType==='busk'?'🌿':'🌳'),
+    desc: pickedDb ? pickedDb.desc : '',
+    tasks: pickedDb ? pickedDb.tasks : {}
+  };
+  if(editingPlantId){
+    const idx = gardenData.plants.findIndex(p=>p.id===editingPlantId);
+    gardenData.plants[idx] = plant;
+  } else {
+    gardenData.plants.push(plant);
+  }
+  saveGarden();
+  renderMarkers();
+  renderJournal();
+  buildYearWheel();
+  pendingLatLng = null;
+  pendingPolygon = null;
+  closeModal('add-modal');
+  toast(polygon ? 'Bed gemt ▱' : 'Plante gemt 🌱');
+}
+
+// ---------- Detail modal ----------
+function openDetail(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p) return;
+  const cm = currentMonthIndex();
+  const taskEntries = Object.keys(p.tasks||{}).map(k=>parseInt(k)).sort((a,b)=>a-b);
+  let tasksHtml = '';
+  if(taskEntries.length){
+    tasksHtml = taskEntries.map(m=>`<div class="detail-task-row ${m===cm?'current':''}"><div class="m">${MONTHS[m]}</div><div>${escapeHtml(p.tasks[m])}</div></div>`).join('');
+  } else {
+    tasksHtml = `<div class="empty-note">Ingen specifikke opgaver registreret for denne plante.</div>`;
+  }
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-emoji" style="background:${TYPE_COLOR[p.type]}22;">${p.image ? `<img src="${escapeAttr(p.image)}">` : (p.icon||'🌱')}</div>
+      <div class="detail-title">
+        <h4>${escapeHtml(p.name)}</h4>
+        <span class="type-tag">${TYPE_LABEL[p.type]||''}${p.polygon ? ' · Bed' : ''}</span>
+      </div>
+    </div>
+    <div class="detail-stats">
+      <div>Højde<b>${p.height ? escapeHtml(p.height) : '—'}</b></div>
+      <div>Blomstrer<b>${p.bloom && p.bloom!=='-' ? escapeHtml(p.bloom) : '—'}</b></div>
+    </div>
+    ${p.desc ? `<div class="detail-desc">${escapeHtml(p.desc)}</div>` : ''}
+    <div class="detail-tasks">
+      <h5>Pasning måned for måned</h5>
+      ${tasksHtml}
+    </div>
+    ${p.notes ? `<div class="detail-note-box"><b>Dine noter:</b><br>${escapeHtml(p.notes)}</div>` : ''}
+    <div class="modal-actions">
+      <button class="secondary-btn delete-plant-btn" onclick="deletePlant('${p.id}')">Slet plante</button>
+      <button class="primary-btn" onclick="editPlant('${p.id}')">Redigér</button>
+    </div>
+  `;
+  document.getElementById('detail-modal').classList.add('show');
+}
+
+function editPlant(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p) return;
+  closeModal('detail-modal');
+  editingPlantId = id;
+  pickedDb = null;
+  pendingLatLng = null;
+  pendingPolygon = null;
+  resetAreaDrawing();
+  selectedType = p.type;
+  document.getElementById('add-modal-title').textContent = p.polygon ? 'Redigér bed' : 'Redigér plante';
+  document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===p.type));
+  document.getElementById('db-search').value='';
+  document.getElementById('db-results').classList.remove('show');
+  document.getElementById('db-picked-box').innerHTML='';
+  document.getElementById('plant-name').value = p.name;
+  document.getElementById('plant-height').value = p.height||'';
+  document.getElementById('plant-bloom').value = p.bloom||'';
+  document.getElementById('plant-image').value = p.image||'';
+  document.getElementById('plant-notes').value = p.notes||'';
+  document.getElementById('add-modal').classList.add('show');
+}
+
+function deletePlant(id){
+  gardenData.plants = gardenData.plants.filter(p=>p.id!==id);
+  saveGarden();
+  renderMarkers();
+  renderJournal();
+  buildYearWheel();
+  closeModal('detail-modal');
+  toast('Plante slettet');
+}
+
+// ---------- utils ----------
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.addr-search')) document.getElementById('addr-suggestions').innerHTML='';
+  if(!e.target.closest('.db-search-wrap')) document.getElementById('db-results').classList.remove('show');
+});
+
+tryAutoLogin();
+</script>
+</body>
+</html>
