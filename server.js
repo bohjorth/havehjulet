@@ -8,6 +8,7 @@ const { readDb, writeDb } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PERENUAL_API_KEY = process.env.PERENUAL_API_KEY || '';
+const TREFLE_API_KEY = process.env.TREFLE_API_KEY || '';
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -116,6 +117,34 @@ app.get('/api/plants/details/:id', authMiddleware, async (req, res) => {
     res.json(data);
   }catch(e){
     res.status(502).json({ error: 'Kunne ikke kontakte Perenual' });
+  }
+});
+
+// ---------- Trefle proxy (keeps the API key server-side only) ----------
+app.get('/api/trefle/search', authMiddleware, async (req, res) => {
+  if(!TREFLE_API_KEY) return res.status(503).json({ error: 'Ingen Trefle-nøgle sat op på serveren' });
+  const q = String(req.query.q || '').trim();
+  if(!q) return res.json({ data: [] });
+  try{
+    const url = `https://trefle.io/api/v1/plants/search?token=${encodeURIComponent(TREFLE_API_KEY)}&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    res.json(data);
+  }catch(e){
+    res.status(502).json({ error: 'Kunne ikke kontakte Trefle' });
+  }
+});
+
+app.get('/api/trefle/details/:id', authMiddleware, async (req, res) => {
+  if(!TREFLE_API_KEY) return res.status(503).json({ error: 'Ingen Trefle-nøgle sat op på serveren' });
+  const id = String(req.params.id).replace(/[^0-9]/g, '');
+  try{
+    const url = `https://trefle.io/api/v1/plants/${id}?token=${encodeURIComponent(TREFLE_API_KEY)}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    res.json(data);
+  }catch(e){
+    res.status(502).json({ error: 'Kunne ikke kontakte Trefle' });
   }
 });
 

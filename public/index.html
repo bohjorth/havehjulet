@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Havehjulet</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<meta name="theme-color" content="#28402c">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1262,7 +1268,6 @@ function pickType(t){
   document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===t));
 }
 let dbSearchTimer = null;
-let lastOnlineResults = [];
 
 function filterDb(){
   const q = document.getElementById('db-search').value.trim().toLowerCase();
@@ -1270,34 +1275,30 @@ function filterDb(){
   if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
 
   const localMatches = PLANT_DB.filter(p=>p.name.toLowerCase().includes(q)).slice(0,6);
-  renderDbResults(localMatches, null);
+  renderDbResults(localMatches, null, null);
   box.classList.add('show');
 
   clearTimeout(dbSearchTimer);
   if(q.length < 2) return;
-  dbSearchTimer = setTimeout(()=>searchOnline(q, localMatches), 450);
+  dbSearchTimer = setTimeout(()=>{
+    searchOnline(q, localMatches, 'perenual', '/plants/search', '/plants/details/', pickExternal);
+    searchOnline(q, localMatches, 'trefle', '/trefle/search', '/trefle/details/', pickTrefle);
+  }, 450);
 }
 
-function renderDbResults(localMatches, onlineState){
-  const box = document.getElementById('db-results');
-  let html = '';
-  if(localMatches.length){
-    html += `<div style="padding:6px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">Fra biblioteket</div>`;
-    html += localMatches.map(p=>`<div class="db-result-item" onclick="pickDb('${p.name.replace(/'/g,"\\'")}')"><span>${p.icon}</span><span>${escapeHtml(p.name)} <span style="opacity:0.55;font-size:11.5px;">· ${TYPE_LABEL[p.type]}</span></span></div>`).join('');
-  } else if(onlineState===null){
-    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen match i biblioteket</div>`;
-  }
+let onlineStates = { perenual: null, trefle: null };
 
-  html += `<div style="padding:8px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">Søg online (Perenual)</div>`;
-  if(onlineState==='loading'){
+function renderOnlineSection(label, state, onPick){
+  let html = `<div style="padding:8px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">${label}</div>`;
+  if(state==='loading'){
     html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Søger…</div>`;
-  } else if(onlineState==='error'){
-    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Onlinesøgning utilgængelig lige nu</div>`;
-  } else if(Array.isArray(onlineState)){
-    if(!onlineState.length){
-      html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen onlineresultater</div>`;
+  } else if(state==='error'){
+    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Utilgængelig lige nu</div>`;
+  } else if(Array.isArray(state)){
+    if(!state.length){
+      html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen resultater</div>`;
     } else {
-      html += onlineState.map((r,i)=>`<div class="db-result-item" onclick="pickExternal(${r.id})">
+      html += state.map(r=>`<div class="db-result-item" onclick="${onPick}(${r.id})">
           ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" style="width:22px;height:22px;object-fit:cover;border-radius:5px;">` : `<span>🌱</span>`}
           <span>${escapeHtml(r.common_name)} <span style="opacity:0.55;font-size:11px;font-style:italic;">${r.scientific ? escapeHtml(r.scientific) : ''}</span></span>
         </div>`).join('');
@@ -1305,27 +1306,46 @@ function renderDbResults(localMatches, onlineState){
   } else {
     html += `<div class="db-result-item" style="opacity:0.5;cursor:default;">Skriv mindst 2 tegn…</div>`;
   }
+  return html;
+}
+
+function renderDbResults(localMatches, perenualState, trefleState){
+  if(perenualState !== undefined) onlineStates.perenual = perenualState;
+  if(trefleState !== undefined) onlineStates.trefle = trefleState;
+  const box = document.getElementById('db-results');
+  let html = '';
+  if(localMatches.length){
+    html += `<div style="padding:6px 12px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a3b2a;opacity:.55;">Fra biblioteket</div>`;
+    html += localMatches.map(p=>`<div class="db-result-item" onclick="pickDb('${p.name.replace(/'/g,"\\'")}')"><span>${p.icon}</span><span>${escapeHtml(p.name)} <span style="opacity:0.55;font-size:11.5px;">· ${TYPE_LABEL[p.type]}</span></span></div>`).join('');
+  } else if(onlineStates.perenual===null){
+    html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen match i biblioteket</div>`;
+  }
+
+  html += renderOnlineSection('Søg online — Perenual', onlineStates.perenual, 'pickExternal');
+  html += renderOnlineSection('Søg online — Trefle', onlineStates.trefle, 'pickTrefle');
+
   box.innerHTML = html;
 }
 
-async function searchOnline(q, localMatches){
-  renderDbResults(localMatches, 'loading');
+async function searchOnline(q, localMatches, key, searchPath, detailsPathPrefix, pickFn){
+  onlineStates[key] = 'loading';
+  renderDbResults(localMatches, undefined, undefined);
   try{
-    const data = await apiFetch(`/plants/search?q=${encodeURIComponent(q)}`);
+    const data = await apiFetch(`${searchPath}?q=${encodeURIComponent(q)}`);
     const results = (data.data||[]).slice(0,8).map(d=>({
       id:d.id,
-      common_name:d.common_name || (d.scientific_name && d.scientific_name[0]) || 'Ukendt navn',
-      scientific: d.scientific_name && d.scientific_name[0],
-      thumb: d.default_image ? (d.default_image.thumbnail || d.default_image.small_url) : null
+      common_name:d.common_name || (d.scientific_name && (Array.isArray(d.scientific_name)?d.scientific_name[0]:d.scientific_name)) || 'Ukendt navn',
+      scientific: Array.isArray(d.scientific_name) ? d.scientific_name[0] : d.scientific_name,
+      thumb: d.default_image ? (d.default_image.thumbnail || d.default_image.small_url) : (d.image_url || null)
     }));
-    lastOnlineResults = results;
-    // only render if the search box still has the same query (avoid race conditions)
     if(document.getElementById('db-search').value.trim().toLowerCase()===q){
-      renderDbResults(localMatches, results);
+      onlineStates[key] = results;
+      renderDbResults(localMatches, undefined, undefined);
     }
   }catch(e){
     if(document.getElementById('db-search').value.trim().toLowerCase()===q){
-      renderDbResults(localMatches, 'error');
+      onlineStates[key] = 'error';
+      renderDbResults(localMatches, undefined, undefined);
     }
   }
 }
@@ -1387,6 +1407,71 @@ async function pickExternal(id){
     document.getElementById('db-search').value='';
     document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
     toast('Data hentet fra Perenual');
+  }catch(e){
+    toast('Kunne ikke hente detaljer — prøv igen');
+    box.classList.remove('show');
+  }
+}
+
+const TREFLE_MONTH_ABBR = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+async function pickTrefle(id){
+  const box = document.getElementById('db-results');
+  box.innerHTML = `<div class="db-result-item" style="opacity:0.6;cursor:default;">Henter detaljer…</div>`;
+  try{
+    const res = await apiFetch(`/trefle/details/${id}`);
+    const d = (res && res.data) ? res.data : res;
+    const sp = d.main_species || {};
+    const growth = sp.growth || {};
+
+    // guess type from family/name — Trefle rarely states this explicitly
+    let type = 'blomst';
+    const t = ((d.family || '') + ' ' + (d.common_name || '')).toLowerCase();
+    if(t.includes('tree') || t.includes('træ')) type = 'træ';
+    else if(t.includes('shrub') || t.includes('bush') || t.includes('vine')) type = 'busk';
+
+    let height = '—';
+    if(growth.spread && (growth.spread.cm || growth.spread.min || growth.spread.max)){
+      const sp2 = growth.spread;
+      height = sp2.cm ? `${sp2.cm} cm` : `${sp2.min||'?'}-${sp2.max||'?'} ${sp2.unit||'cm'}`;
+    }
+
+    let bloom = '-';
+    if(Array.isArray(growth.bloom_months) && growth.bloom_months.length){
+      bloom = growth.bloom_months.map(m=>String(m).slice(0,3)).join(', ');
+    }
+
+    const tasks = {};
+    if(Array.isArray(growth.bloom_months)){
+      growth.bloom_months.forEach(mAbbr=>{
+        const idx = TREFLE_MONTH_ABBR.indexOf(String(mAbbr).toLowerCase().slice(0,3));
+        if(idx>-1) tasks[idx] = 'Blomstrer';
+      });
+    }
+
+    const descParts = [];
+    if(growth.light) descParts.push('Lysbehov (0-10): ' + growth.light);
+    if(growth.atmospheric_humidity) descParts.push('Luftfugtighed (0-10): ' + growth.atmospheric_humidity);
+    if(growth.minimum_temperature && growth.minimum_temperature.deg_c != null) descParts.push('Min. temp: ' + growth.minimum_temperature.deg_c + '°C');
+    const desc = descParts.join('. ') || 'Hentet fra Trefle plantedatabase.';
+
+    const image = d.image_url || (sp.images && sp.images.flower && sp.images.flower[0] && sp.images.flower[0].image_url) || '';
+
+    pickedDb = {
+      name: d.common_name || d.scientific_name || 'Ukendt plante',
+      type, height, bloom, desc, tasks,
+      icon: type==='træ' ? '🌳' : type==='busk' ? '🌿' : '🌸'
+    };
+    selectedType = type;
+    document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
+    document.getElementById('plant-name').value = pickedDb.name;
+    document.getElementById('plant-height').value = height==='—' ? '' : height;
+    document.getElementById('plant-bloom').value = bloom==='-' ? '' : bloom;
+    if(image) document.getElementById('plant-image').value = image;
+    document.getElementById('db-results').classList.remove('show');
+    document.getElementById('db-search').value='';
+    document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+    toast('Data hentet fra Trefle');
   }catch(e){
     toast('Kunne ikke hente detaljer — prøv igen');
     box.classList.remove('show');
