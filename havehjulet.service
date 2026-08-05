@@ -1,0 +1,15 @@
+[Unit]
+Description=Havehjulet
+After=network.target
+
+[Service]
+Type=simple
+User=havehjulet
+WorkingDirectory=/opt/havehjulet
+EnvironmentFile=/opt/havehjulet/.env
+ExecStart=/usr/bin/node /opt/havehjulet/server.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
