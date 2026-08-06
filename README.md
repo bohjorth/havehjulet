@@ -54,7 +54,7 @@ Inde i containeren:
 ```bash
 cd /opt/havehjulet
 cp .env.example .env
-nano .env        # tjek at PERENUAL_API_KEY er den rigtige nøgle, og evt. skift PORT
+nano .env        # tjek nøgler, PORT, og udfyld evt. PUBLIC_URL + SMTP-felter (se nedenfor)
 npm install
 ```
 
@@ -108,6 +108,20 @@ Kører du kun internt på dit hjemmenetværk uden domæne, er alm. HTTP fint —
 
 ## Data og backup
 Alle konti og havedata gemmes i `/opt/havehjulet/data/db.json`. Tag jævnligt en kopi af den fil (eller hele `/opt/havehjulet/data/`) som backup — f.eks. med en cronjob der kopierer den til Proxmox-værten eller din NAS.
+
+## E-mail (påmindelser + glemt adgangskode)
+For at appen kan sende mails (månedlige havepåmindelser og "glemt adgangskode"-links), skal `.env` udfyldes med SMTP-oplysninger:
+```
+PUBLIC_URL=http://din-ip-eller-domæne     # bruges i links i mails
+SMTP_HOST=smtp.dit-mailudbyder.dk
+SMTP_PORT=587
+SMTP_USER=dit-brugernavn
+SMTP_PASS=dit-kodeord-eller-app-password
+SMTP_FROM=havehjulet@dit-domæne.dk
+```
+Mange gratis mailudbydere (Gmail, Outlook m.fl.) kræver et separat "app password" i stedet for din normale adgangskode — søg efter "app password" + udbyderens navn. Efterlades felterne tomme, logger appen bare mailen i konsollen (`journalctl -u havehjulet -f`) i stedet for at sende den — praktisk til test.
+
+Hver bruger slår selv påmindelser til/fra og angiver sin e-mail under ⚙ Indstillinger inde i appen.
 
 ## Opdatering af appen senere
 ```bash

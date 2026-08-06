@@ -2,7 +2,12 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Havehjulet">
+<link rel="manifest" href="/manifest.json">
 <title>Havehjulet</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -149,6 +154,26 @@
 
   .dash-grid{display:grid;grid-template-columns:420px 1fr;gap:36px;margin-top:26px;align-items:start;}
   @media (max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+  .weather-card{
+    background:var(--parchment-2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 20px;margin-top:18px;display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  }
+  .weather-now{display:flex;align-items:center;gap:12px;}
+  .weather-now .icon{font-size:34px;line-height:1;}
+  .weather-now .temp{font-family:'Fraunces',serif;font-size:28px;font-weight:600;color:var(--moss);}
+  .weather-now .place{font-size:11.5px;color:var(--soil);opacity:0.65;font-family:'JetBrains Mono',monospace;}
+  .weather-days{display:flex;gap:14px;flex:1;flex-wrap:wrap;}
+  .weather-day{text-align:center;font-size:11.5px;color:var(--soil);min-width:44px;}
+  .weather-day .d{font-family:'JetBrains Mono',monospace;font-weight:600;opacity:0.7;}
+  .weather-day .i{font-size:19px;margin:2px 0;}
+  .weather-day .t{font-weight:600;color:var(--ink);}
+  .weather-day .t small{font-weight:400;opacity:0.55;}
+  .frost-badge{
+    background:#5c7a8a22;color:#3d5866;border:1px solid #5c7a8a55;padding:5px 12px;border-radius:999px;
+    font-size:11.5px;font-weight:700;white-space:nowrap;
+  }
+  .weather-empty{font-size:12.5px;color:var(--soil);opacity:0.6;padding:14px 20px;}
 
   .wheel-wrap{display:flex;flex-direction:column;align-items:center;}
   .wheel-wrap svg{overflow:visible;}
@@ -302,6 +327,47 @@
     box-shadow:var(--shadow);z-index:3000;opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  /* ===== MOBILE ===== */
+  @media (max-width: 640px){
+    body{-webkit-tap-highlight-color:transparent;}
+    .auth-card{grid-template-columns:1fr;min-height:0;}
+    .auth-hero{padding:30px 24px 26px;}
+    .auth-hero h1{font-size:26px;}
+    .auth-hero .wheel-deco{display:none;}
+    .month-strip{padding-top:16px;}
+    .auth-form-side{padding:26px 24px 30px;}
+
+    header.topbar{flex-wrap:wrap;gap:10px;padding:12px 14px;}
+    .brand .sub{display:none;}
+    nav.view-tabs{order:3;width:100%;justify-content:center;}
+    .topbar-right{margin-left:auto;}
+    .user-pill{display:none;}
+
+    .view{padding:18px 12px 40px;}
+    .dash-head{flex-direction:column;align-items:flex-start;gap:6px;}
+    .dash-head h2{font-size:23px;}
+    .dash-grid{gap:22px;margin-top:18px;}
+    .wheel-wrap svg{width:100%;height:auto;max-width:380px;}
+    .task-panel{padding:20px 18px;min-height:0;}
+
+    .map-view-inner{border-radius:12px;}
+    .journal{max-height:34vh;border-right:none;border-bottom:1px solid var(--line);}
+    .journal-list{max-height:none;}
+    #map{height:56vh;min-height:340px;}
+    .map-toolbar{top:10px;left:10px;right:10px;gap:6px;}
+    .addr-search input, .journal-search, .field input, textarea.notes, #db-search{font-size:16px;}
+    .toggle-add-btn{padding:10px 12px;font-size:12.5px;}
+    .add-mode-banner{left:10px;right:10px;transform:none;width:auto;text-align:center;}
+
+    .modal{max-width:100%;margin:0 6px;max-height:92vh;}
+    .modal-body{padding:18px 16px;}
+    .field-row{grid-template-columns:1fr;}
+    .type-choice{flex-wrap:wrap;}
+    .type-choice button{flex:1 1 30%;}
+    .detail-hero{flex-wrap:wrap;}
+    .modal-actions{flex-wrap:wrap;}
+    .modal-actions button{flex:1 1 100%;}
+  }
 </style>
 </head>
 <body>
@@ -345,6 +411,9 @@
         </div>
         <button class="primary-btn" onclick="handleLogin()">Log ind</button>
         <div class="auth-msg" id="login-msg"></div>
+        <div style="text-align:center;margin-top:12px;">
+          <button type="button" onclick="openForgotModal()" style="background:none;border:none;color:var(--soil);opacity:0.7;font-size:12.5px;text-decoration:underline;cursor:pointer;">Glemt adgangskode?</button>
+        </div>
       </div>
 
       <div id="register-form" style="display:none;">
@@ -356,11 +425,61 @@
           <label>Vælg adgangskode</label>
           <input type="password" id="reg-password" autocomplete="new-password" placeholder="Mindst 4 tegn">
         </div>
+        <div class="field">
+          <label>E-mail (valgfrit — bruges kun til påmindelser og evt. nulstilling af adgangskode)</label>
+          <input type="email" id="reg-email" autocomplete="email" placeholder="din@mail.dk">
+        </div>
+        <div class="field">
+          <label>Invitationskode (valgfrit — for at dele en have med andre)</label>
+          <input type="text" id="reg-invite" placeholder="Indsæt kode hvis du er inviteret">
+        </div>
         <button class="primary-btn" onclick="handleRegister()">Opret konto</button>
         <div class="auth-msg" id="register-msg"></div>
       </div>
 
       <div class="auth-hint">Flere kan bruge Havehjulet — hver konto har sit eget kort og sine egne planter, gemt automatisk.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FORGOT PASSWORD MODAL ===== -->
+<div class="modal-overlay" id="forgot-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Glemt adgangskode</h3>
+      <button class="modal-close" onclick="closeModal('forgot-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Din e-mail</label>
+        <input type="email" id="forgot-email" placeholder="din@mail.dk">
+      </div>
+      <div class="auth-msg" id="forgot-msg"></div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('forgot-modal')">Luk</button>
+        <button class="primary-btn" onclick="handleForgotPassword()">Send link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESET PASSWORD MODAL ===== -->
+<div class="modal-overlay" id="reset-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Vælg ny adgangskode</h3>
+      <button class="modal-close" onclick="closeModal('reset-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Ny adgangskode</label>
+        <input type="password" id="reset-password" placeholder="Mindst 4 tegn">
+      </div>
+      <div class="auth-msg" id="reset-msg"></div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('reset-modal')">Annuller</button>
+        <button class="primary-btn" onclick="handleResetPassword()">Gem ny adgangskode</button>
+      </div>
     </div>
   </div>
 </div>
@@ -385,6 +504,7 @@
     </nav>
     <div class="topbar-right">
       <span class="user-pill" id="user-pill"></span>
+      <button class="logout-btn" onclick="openSettingsModal()" title="Indstillinger">⚙</button>
       <button class="logout-btn" onclick="handleLogout()">Log ud</button>
     </div>
   </header>
@@ -399,6 +519,8 @@
         </div>
         <div class="today-mono" id="today-label"></div>
       </div>
+
+      <div id="weather-widget"></div>
 
       <div class="dash-grid">
         <div class="wheel-wrap">
@@ -496,6 +618,16 @@
       </div>
 
       <div class="field">
+        <label>Genkend ud fra et billede</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="secondary-btn" style="flex:0 0 auto;padding:10px 16px;" onclick="document.getElementById('photo-id-input').click()">📷 Scan plante</button>
+          <input type="file" id="photo-id-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoSelected(event)">
+          <span id="photo-id-status" class="mono" style="font-size:12px;color:var(--soil);opacity:0.75;"></span>
+        </div>
+        <div id="photo-id-results"></div>
+      </div>
+
+      <div class="field">
         <label>Søg efter plante (bibliotek + online)</label>
         <div class="db-search-wrap">
           <input type="text" id="db-search" placeholder="f.eks. rose, hortensia, japansk løn…" oninput="filterDb()" onfocus="filterDb()">
@@ -547,6 +679,17 @@
       <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
     </div>
     <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3>Indstillinger</h3>
+      <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="settings-body">Indlæser…</div>
   </div>
 </div>
 
@@ -868,6 +1011,8 @@ function showMsg(id, text, ok){
 async function handleRegister(){
   const username = document.getElementById('reg-username').value.trim().toLowerCase();
   const password = document.getElementById('reg-password').value;
+  const email = document.getElementById('reg-email').value.trim();
+  const inviteCode = document.getElementById('reg-invite').value.trim();
   if(!username || !/^[a-z0-9_-]{2,24}$/.test(username)){
     showMsg('register-msg','Brugernavn skal være 2-24 tegn (bogstaver, tal, - og _).', false); return;
   }
@@ -875,8 +1020,8 @@ async function handleRegister(){
     showMsg('register-msg','Adgangskoden skal være mindst 4 tegn.', false); return;
   }
   try{
-    await apiFetch('/register', {method:'POST', body: JSON.stringify({username, password})});
-    showMsg('register-msg','Konto oprettet! Du kan nu logge ind.', true);
+    const result = await apiFetch('/register', {method:'POST', body: JSON.stringify({username, password, email, inviteCode})});
+    showMsg('register-msg', result.joinedSharedGarden ? 'Konto oprettet og tilsluttet den delte have! Du kan nu logge ind.' : 'Konto oprettet! Du kan nu logge ind.', true);
     document.getElementById('reg-password').value='';
     setTimeout(()=>{ switchAuthTab('login'); document.getElementById('login-username').value = username; }, 700);
   }catch(e){
@@ -954,7 +1099,263 @@ function enterApp(){
   initMapIfNeeded();
   renderJournal();
   renderAddressList();
+  loadWeather();
 }
+
+// ---------- Weather (Open-Meteo, no key needed) ----------
+const WEATHER_ICONS = {
+  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',
+  51:'🌦️',53:'🌦️',55:'🌦️',56:'🌦️',57:'🌦️',
+  61:'🌧️',63:'🌧️',65:'🌧️',66:'🌧️',67:'🌧️',
+  71:'🌨️',73:'🌨️',75:'🌨️',77:'🌨️',
+  80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'🌨️',
+  95:'⛈️',96:'⛈️',99:'⛈️'
+};
+function weatherIcon(code){ return WEATHER_ICONS[code] || '🌡️'; }
+
+async function loadWeather(){
+  const el = document.getElementById('weather-widget');
+  if(!el) return;
+
+  let lat, lng, placeName;
+  if(gardenData.addresses && gardenData.addresses.length){
+    const a = gardenData.addresses[0];
+    lat = a.lat; lng = a.lng; placeName = a.name;
+  } else if(gardenData.center){
+    lat = gardenData.center.lat; lng = gardenData.center.lng; placeName = 'Kortets midte';
+  }
+
+  if(lat == null || lng == null){
+    el.innerHTML = `<div class="weather-card weather-empty">Gem en adresse på kortet for at se vejret her 🌦️</div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="weather-card weather-empty">Henter vejr…</div>`;
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+
+    const current = data.current || {};
+    const daily = data.daily || {};
+    const days = (daily.time || []).map((d,i)=>({
+      date: new Date(d),
+      code: daily.weather_code[i],
+      max: Math.round(daily.temperature_2m_max[i]),
+      min: Math.round(daily.temperature_2m_min[i])
+    }));
+
+    const frostDay = days.find(d => d.min <= 0);
+    const dayNames = ['Søn','Man','Tir','Ons','Tor','Fre','Lør'];
+
+    el.innerHTML = `<div class="weather-card">
+        <div class="weather-now">
+          <div class="icon">${weatherIcon(current.weather_code)}</div>
+          <div>
+            <div class="temp">${Math.round(current.temperature_2m)}°</div>
+            <div class="place">${escapeHtml(placeName || '')}</div>
+          </div>
+        </div>
+        <div class="weather-days">
+          ${days.map(d=>`<div class="weather-day">
+              <div class="d">${dayNames[d.date.getDay()]}</div>
+              <div class="i">${weatherIcon(d.code)}</div>
+              <div class="t">${d.max}° <small>${d.min}°</small></div>
+            </div>`).join('')}
+        </div>
+        ${frostDay ? `<div class="frost-badge">❄️ Frostrisiko ${dayNames[frostDay.date.getDay()]}</div>` : ''}
+      </div>`;
+  }catch(e){
+    el.innerHTML = `<div class="weather-card weather-empty">Kunne ikke hente vejrdata lige nu</div>`;
+  }
+}
+
+// ---------- Settings (account, reminders, shared garden) ----------
+async function openSettingsModal(){
+  const body = document.getElementById('settings-body');
+  body.innerHTML = 'Indlæser…';
+  document.getElementById('settings-modal').classList.add('show');
+  try{
+    const acc = await apiFetch('/account');
+    renderSettingsBody(acc);
+  }catch(e){
+    body.innerHTML = `<div class="empty-note">Kunne ikke hente kontoindstillinger.</div>`;
+  }
+}
+
+function renderSettingsBody(acc){
+  const body = document.getElementById('settings-body');
+  body.innerHTML = `
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="settings-email" value="${escapeAttr(acc.email||'')}" placeholder="din@mail.dk">
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="settings-reminders" ${acc.remindersEnabled?'checked':''} style="width:auto;">
+      <label style="margin:0;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);">Send mig en månedlig påmindelse om havens opgaver</label>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="sendTestReminder()">Send test-mail nu</button>
+      <button class="primary-btn" onclick="saveAccountSettings()">Gem</button>
+    </div>
+    <div class="auth-msg" id="settings-msg"></div>
+
+    <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
+    <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Delt have</h4>
+    ${acc.isOwnGarden
+      ? `<div class="empty-note" style="margin-bottom:10px;">Du bruger din egen have. Del den med andre i husstanden:</div>
+         <div class="modal-actions" style="margin-top:0;">
+           <button class="secondary-btn" onclick="showInviteCode()" style="flex:1;">Vis invitationskode</button>
+         </div>
+         <div id="invite-code-box"></div>`
+      : `<div class="empty-note" style="margin-bottom:10px;">Du er med i en delt have (${(acc.members||[]).length} medlemmer: ${escapeHtml((acc.members||[]).join(', '))}).</div>
+         <div class="modal-actions" style="margin-top:0;">
+           <button class="secondary-btn delete-plant-btn" onclick="leaveSharedGarden()" style="flex:1;">Forlad delt have</button>
+         </div>`
+    }
+    <div class="field" style="margin-top:14px;">
+      <label>Tilslut en delt have via kode</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="join-code-input" placeholder="Indsæt invitationskode" style="flex:1;">
+        <button class="secondary-btn" style="flex:0 0 auto;" onclick="joinSharedGarden()">Tilslut</button>
+      </div>
+      <div class="auth-hint" style="margin-top:8px;">Bemærk: dine egne planter forbliver gemt, men du ser den delte haves kort og planter i stedet, indtil du forlader den igen.</div>
+    </div>
+  `;
+}
+
+async function saveAccountSettings(){
+  const email = document.getElementById('settings-email').value.trim();
+  const remindersEnabled = document.getElementById('settings-reminders').checked;
+  try{
+    await apiFetch('/account', {method:'PUT', body: JSON.stringify({email, remindersEnabled})});
+    document.getElementById('settings-msg').className = 'auth-msg show ok';
+    document.getElementById('settings-msg').textContent = 'Gemt!';
+  }catch(e){
+    document.getElementById('settings-msg').className = 'auth-msg show error';
+    document.getElementById('settings-msg').textContent = e.message || 'Kunne ikke gemme';
+  }
+}
+
+async function sendTestReminder(){
+  try{
+    await apiFetch('/reminders/send-test', {method:'POST'});
+    toast('Test-mail sendt (tjek din indbakke om lidt)');
+  }catch(e){
+    toast(e.message || 'Kunne ikke sende test-mail');
+  }
+}
+
+async function showInviteCode(){
+  try{
+    const res = await apiFetch('/garden/invite');
+    document.getElementById('invite-code-box').innerHTML = `
+      <div class="db-picked" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <span>Del denne kode med resten af husstanden:</span>
+        <b class="mono" style="font-size:15px;user-select:all;">${escapeHtml(res.code)}</b>
+        ${res.joinUrl ? `<span style="font-size:11.5px;word-break:break-all;">${escapeHtml(res.joinUrl)}</span>` : ''}
+      </div>`;
+  }catch(e){
+    toast('Kunne ikke hente invitationskode');
+  }
+}
+
+async function joinSharedGarden(){
+  const code = document.getElementById('join-code-input').value.trim();
+  if(!code){ toast('Indsæt en kode først'); return; }
+  if(!confirm('Sikker på du vil tilslutte dig denne have? Du vil fremover se den delte haves kort og planter.')) return;
+  try{
+    await apiFetch('/garden/join', {method:'POST', body: JSON.stringify({code})});
+    toast('Tilsluttet! Genindlæser have…');
+    await loadGarden();
+    renderMarkers(); renderAddressMarkers(); renderJournal(); renderAddressList(); buildYearWheel(); loadWeather();
+    openSettingsModal();
+  }catch(e){
+    toast(e.message || 'Ugyldig kode');
+  }
+}
+
+async function leaveSharedGarden(){
+  if(!confirm('Forlad den delte have og gå tilbage til din egen?')) return;
+  try{
+    await apiFetch('/garden/leave', {method:'POST'});
+    toast('Tilbage i din egen have');
+    await loadGarden();
+    renderMarkers(); renderAddressMarkers(); renderJournal(); renderAddressList(); buildYearWheel(); loadWeather();
+    openSettingsModal();
+  }catch(e){
+    toast(e.message || 'Kunne ikke forlade haven');
+  }
+}
+
+// ---------- Forgot / reset password ----------
+function openForgotModal(){
+  document.getElementById('forgot-email').value='';
+  document.getElementById('forgot-msg').className = 'auth-msg';
+  document.getElementById('forgot-modal').classList.add('show');
+}
+
+async function handleForgotPassword(){
+  const email = document.getElementById('forgot-email').value.trim();
+  if(!email){ return; }
+  try{
+    const res = await apiFetch('/forgot-password', {method:'POST', body: JSON.stringify({email})});
+    document.getElementById('forgot-msg').className = 'auth-msg show ok';
+    document.getElementById('forgot-msg').textContent = res.message;
+  }catch(e){
+    document.getElementById('forgot-msg').className = 'auth-msg show error';
+    document.getElementById('forgot-msg').textContent = 'Der gik noget galt. Prøv igen.';
+  }
+}
+
+let pendingResetToken = null;
+function openResetModal(token){
+  pendingResetToken = token;
+  document.getElementById('reset-password').value='';
+  document.getElementById('reset-msg').className = 'auth-msg';
+  document.getElementById('reset-modal').classList.add('show');
+}
+
+async function handleResetPassword(){
+  const password = document.getElementById('reset-password').value;
+  if(password.length < 4){
+    document.getElementById('reset-msg').className = 'auth-msg show error';
+    document.getElementById('reset-msg').textContent = 'Adgangskoden skal være mindst 4 tegn.';
+    return;
+  }
+  try{
+    await apiFetch('/reset-password', {method:'POST', body: JSON.stringify({token: pendingResetToken, password})});
+    document.getElementById('reset-msg').className = 'auth-msg show ok';
+    document.getElementById('reset-msg').textContent = 'Adgangskode ændret! Du kan nu logge ind.';
+    setTimeout(()=>{ closeModal('reset-modal'); switchAuthTab('login'); }, 1200);
+  }catch(e){
+    document.getElementById('reset-msg').className = 'auth-msg show error';
+    document.getElementById('reset-msg').textContent = e.message || 'Linket er ugyldigt eller udløbet.';
+  }
+}
+
+// handle ?reset=TOKEN and ?join=CODE in the URL on page load
+(function handleUrlParams(){
+  const params = new URLSearchParams(window.location.search);
+  const resetToken = params.get('reset');
+  const joinCode = params.get('join');
+  if(resetToken){
+    openResetModal(resetToken);
+  } else if(joinCode){
+    switchAuthTab('register');
+    setTimeout(()=>{
+      const el = document.getElementById('reg-invite');
+      if(el) el.value = joinCode;
+    }, 0);
+  }
+  if(resetToken || joinCode){
+    const url = new URL(window.location.href);
+    url.searchParams.delete('reset');
+    url.searchParams.delete('join');
+    window.history.replaceState({}, '', url.toString());
+  }
+})();
 
 function switchView(view){
   document.getElementById('tab-dash').classList.toggle('active', view==='dash');
@@ -1430,6 +1831,7 @@ function saveAddress(){
   saveGarden();
   renderAddressList();
   renderAddressMarkers();
+  if(gardenData.addresses.length===1) loadWeather();
   closeModal('address-modal');
   toast('Adresse gemt 📍');
 }
@@ -1448,6 +1850,7 @@ function deleteAddress(id){
   saveGarden();
   renderAddressList();
   renderAddressMarkers();
+  loadWeather();
   toast('Adresse slettet');
 }
 
@@ -1456,6 +1859,8 @@ function openAddModal(){
   editingPlantId = null;
   pickedDb = null;
   selectedType = 'blomst';
+  document.getElementById('photo-id-status').textContent = '';
+  document.getElementById('photo-id-results').innerHTML = '';
   document.getElementById('add-modal-title').textContent = pendingPolygon ? 'Nyt bed' : 'Ny plante';
   document.getElementById('type-choice').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.type==='blomst'));
   document.getElementById('db-search').value='';
@@ -1587,6 +1992,61 @@ function pickGbif(key){
   toast(`Fundet: ${item.scientific} — søger nu Perenual/Trefle for pasningsinfo…`);
   document.getElementById('db-search').value = item.scientific;
   filterDb();
+}
+
+// ---------- Photo identification (Pl@ntNet) ----------
+let plantnetResults = [];
+
+async function handlePhotoSelected(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('photo-id-status');
+  const resultsEl = document.getElementById('photo-id-results');
+  statusEl.textContent = 'Identificerer billedet…';
+  resultsEl.innerHTML = '';
+  try{
+    const form = new FormData();
+    form.append('image', file);
+    const headers = {};
+    if(authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    const res = await fetch('/api/plantnet/identify', { method:'POST', body: form, headers });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Fejl fra server');
+
+    plantnetResults = (data.results || []).slice(0, 5);
+    statusEl.textContent = '';
+    if(!plantnetResults.length){
+      resultsEl.innerHTML = `<div class="db-result-item" style="opacity:0.6;cursor:default;">Kunne ikke genkende planten — prøv et billede med tydelige blade/blomster</div>`;
+      return;
+    }
+    resultsEl.innerHTML = plantnetResults.map((r,i)=>{
+      const sci = (r.species && r.species.scientificNameWithoutAuthor) || 'Ukendt art';
+      const common = (r.species && r.species.commonNames && r.species.commonNames[0]) || '';
+      const pct = Math.round((r.score||0)*100);
+      return `<div class="db-result-item" onclick="pickPlantnetResult(${i})">
+          <span>🔎</span>
+          <span>${escapeHtml(common || sci)} <span style="opacity:0.55;font-size:11px;font-style:italic;">${escapeHtml(sci)} · ${pct}%</span></span>
+        </div>`;
+    }).join('');
+  }catch(err){
+    statusEl.textContent = 'Kunne ikke identificere billedet — prøv igen';
+  }
+  e.target.value = '';
+}
+
+function pickPlantnetResult(i){
+  const r = plantnetResults[i];
+  if(!r) return;
+  const sci = r.species && r.species.scientificNameWithoutAuthor;
+  const common = r.species && r.species.commonNames && r.species.commonNames[0];
+  if(common) document.getElementById('plant-name').value = common;
+  document.getElementById('photo-id-results').innerHTML = '';
+  document.getElementById('photo-id-status').textContent = '';
+  if(sci){
+    toast(`Genkendt: ${sci} — søger nu pasningsinfo…`);
+    document.getElementById('db-search').value = sci;
+    filterDb();
+  }
 }
 
 async function searchOnline(q, localMatches, key, searchPath, detailsPathPrefix, pickFn){
@@ -1855,6 +2315,8 @@ function editPlant(id){
   pendingLatLng = null;
   pendingPolygon = null;
   resetAreaDrawing();
+  document.getElementById('photo-id-status').textContent = '';
+  document.getElementById('photo-id-results').innerHTML = '';
   selectedType = p.type;
   document.getElementById('add-modal-title').textContent = p.polygon ? 'Redigér bed' : 'Redigér plante';
   document.querySelectorAll('#type-choice button').forEach(b=>b.classList.toggle('active', b.dataset.type===p.type));
@@ -1891,6 +2353,12 @@ document.addEventListener('click', (e)=>{
 });
 
 tryAutoLogin();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
