@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const cron = require('node-cron');
 const { readDb, writeDb } = require('./db');
@@ -15,10 +16,14 @@ const TREFLE_API_KEY = process.env.TREFLE_API_KEY || '';
 const PLANTNET_API_KEY = process.env.PLANTNET_API_KEY || '';
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
 
+const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '30d' }));
 
 const USERNAME_RE = /^[a-z0-9_-]{2,24}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -138,7 +143,8 @@ app.get('/api/account', authMiddleware, (req, res) => {
     remindersEnabled: !!user.remindersEnabled,
     gardenId: req.gardenId,
     isOwnGarden: req.gardenId === req.username,
-    members: garden.members || [req.username]
+    members: garden.members || [req.username],
+    createdAt: user.createdAt || null
   });
 });
 
@@ -342,6 +348,21 @@ app.post('/api/plantnet/identify', authMiddleware, upload.single('image'), async
   }catch(e){
     res.status(502).json({ error: 'Kunne ikke kontakte Pl@ntNet' });
   }
+});
+
+// ---------- Photo uploads (growth log / plant photo history) ----------
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const EXT_BY_MIME = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/gif':'gif' };
+
+app.post('/api/upload-image', authMiddleware, upload.single('image'), (req, res) => {
+  if(!req.file) return res.status(400).json({ error: 'Intet billede modtaget' });
+  if(!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)){
+    return res.status(400).json({ error: 'Kun JPEG, PNG, WEBP eller GIF er tilladt' });
+  }
+  const ext = EXT_BY_MIME[req.file.mimetype] || 'jpg';
+  const filename = `${req.gardenId}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+  res.json({ url: `/uploads/${filename}` });
 });
 
 // ---------- Monthly reminder emails ----------
