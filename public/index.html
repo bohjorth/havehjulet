@@ -309,6 +309,10 @@
   .secondary-btn{flex:1;background:transparent;border:1.5px solid var(--line);color:var(--soil);border-radius:9px;padding:12px;font-size:13.5px;font-weight:600;}
   .secondary-btn:hover{border-color:var(--clay);color:var(--clay);}
   .modal .primary-btn{flex:1.4;margin-top:0;}
+  .task-month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .task-month-cell label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--clay);margin-bottom:3px;}
+  .task-month-cell input{width:100%;padding:8px 9px;border-radius:7px;border:1.5px solid var(--line);background:#fffdf6;font-size:12.5px;}
+  .task-month-cell input:focus{border-color:var(--fern);outline:none;}
 
   /* detail modal */
   .detail-hero{display:flex;gap:16px;align-items:center;margin-bottom:18px;}
@@ -371,6 +375,7 @@
     .field-row{grid-template-columns:1fr;}
     .type-choice{flex-wrap:wrap;}
     .type-choice button{flex:1 1 30%;}
+    .task-month-grid{grid-template-columns:repeat(2,1fr);}
     .detail-hero{flex-wrap:wrap;}
     .modal-actions{flex-wrap:wrap;}
     .modal-actions button{flex:1 1 100%;}
@@ -622,6 +627,7 @@
         <button data-type="blomst" onclick="pickType('blomst')">🌸 Blomst</button>
         <button data-type="busk" onclick="pickType('busk')">🌿 Busk</button>
         <button data-type="træ" onclick="pickType('træ')">🌳 Træ</button>
+        <button data-type="plæne" onclick="pickType('plæne')">🟩 Plæne</button>
       </div>
 
       <div class="field">
@@ -668,6 +674,11 @@
       <div class="field">
         <label>Noter</label>
         <textarea class="notes" id="plant-notes" placeholder="Egne noter om denne plante…"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Pasning måned for måned (valgfrit — udfyldes automatisk hvis du søgte planten frem, men du kan altid rette)</label>
+        <div class="task-month-grid" id="task-month-grid"></div>
       </div>
 
       <div class="modal-actions">
@@ -722,8 +733,8 @@ function seasonForMonth(i){
   return SEASON_COLOR.autumn;
 }
 
-const TYPE_COLOR = { blomst:'#bd5468', busk:'#5b8c4a', 'træ':'#2f4f30' };
-const TYPE_LABEL = { blomst:'Blomst', busk:'Busk', 'træ':'Træ' };
+const TYPE_COLOR = { blomst:'#bd5468', busk:'#5b8c4a', 'træ':'#2f4f30', 'plæne':'#9c9a3f' };
+const TYPE_LABEL = { blomst:'Blomst', busk:'Busk', 'træ':'Træ', 'plæne':'Plæne' };
 
 // ---------- Plant library ----------
 const PLANT_DB = [
@@ -936,7 +947,19 @@ const PLANT_DB = [
   {name:'Ginkgo', type:'træ', height:'10-25 m', bloom:'-', icon:'🍁', desc:'Levende fossil med karakteristiske vifteformede, gule efterårsblade.',
    tasks:{}},
   {name:'Robinie', type:'træ', height:'10-20 m', bloom:'jun', icon:'🤍', desc:'Duftende, hængende blomsterklaser, tåler tør og mager jord.',
-   tasks:{}}
+   tasks:{}},
+
+  /* ---- Plæne ---- */
+  {name:'Græsplæne', type:'plæne', height:'—', bloom:'-', icon:'🟩', desc:'Almindelig brugsplæne. I tørkeperioder klarer græs sig bedst ved at blive klippet højere og sjældnere frem for at blive vandet — det går i en form for "sommerdvale" og kommer sig, når regnen vender tilbage. Tjek tørkeindekset på forsiden, før du klipper kort i varmen.',
+   tasks:{
+     3:'Rag mos og løv væk (skarpe river), første klipning i tørt vejr — klip højt',
+     4:'Gød med forårsgødning; kalk hvis plænen er mosset eller jorden sur',
+     5:'Klip jævnligt (højst 1/3 af længden ad gangen)',
+     6:'Tjek tørkeindekset: er det "Tørt" eller "Meget tørt" — hæv klippehøjden, klip sjældnere og undlad at vande',
+     7:'Fortsat tørketilpasset klipning — undgå at gøde i varme, tørre perioder',
+     9:'Eftergød, vertikalskær/luft plænen, og efterså tynde/nøgne områder',
+     10:'Sidste klipning når væksten går i stå, fjern faldne blade løbende'
+   }}
 ];
 
 const GENERIC_TASKS = {
@@ -1891,6 +1914,32 @@ function deleteAddress(id){
 }
 
 // ---------- Add plant modal ----------
+function buildTaskMonthGrid(){
+  const grid = document.getElementById('task-month-grid');
+  grid.innerHTML = MONTHS.map((m,i)=>`
+    <div class="task-month-cell">
+      <label>${m}</label>
+      <input type="text" id="task-month-${i}" placeholder="–">
+    </div>`).join('');
+}
+
+function populateTaskFields(tasks){
+  for(let i=0;i<12;i++){
+    const el = document.getElementById(`task-month-${i}`);
+    if(el) el.value = (tasks && tasks[i]) ? tasks[i] : '';
+  }
+}
+
+function collectTasksFromFields(){
+  const tasks = {};
+  for(let i=0;i<12;i++){
+    const el = document.getElementById(`task-month-${i}`);
+    const val = el ? el.value.trim() : '';
+    if(val) tasks[i] = val;
+  }
+  return tasks;
+}
+
 function openAddModal(){
   editingPlantId = null;
   pickedDb = null;
@@ -1907,6 +1956,7 @@ function openAddModal(){
   document.getElementById('plant-bloom').value='';
   document.getElementById('plant-image').value='';
   document.getElementById('plant-notes').value='';
+  buildTaskMonthGrid();
   document.getElementById('add-modal').classList.add('show');
 }
 function closeModal(id){
@@ -2164,6 +2214,7 @@ async function pickExternal(id){
     document.getElementById('db-results').classList.remove('show');
     document.getElementById('db-search').value='';
     document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+    populateTaskFields(pickedDb.tasks);
     toast('Data hentet fra Perenual');
   }catch(e){
     toast('Kunne ikke hente detaljer — prøv igen');
@@ -2229,6 +2280,7 @@ async function pickTrefle(id){
     document.getElementById('db-results').classList.remove('show');
     document.getElementById('db-search').value='';
     document.getElementById('db-picked-box').innerHTML = `<div class="db-picked">${image?`<img src="${escapeAttr(image)}" style="width:26px;height:26px;object-fit:cover;border-radius:6px;">`:'<span style="font-size:20px;">🌱</span>'}<span>Hentet online: <b>${escapeHtml(pickedDb.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+    populateTaskFields(pickedDb.tasks);
     toast('Data hentet fra Trefle');
   }catch(e){
     toast('Kunne ikke hente detaljer — prøv igen');
@@ -2248,6 +2300,7 @@ function pickDb(name){
   document.getElementById('db-results').classList.remove('show');
   document.getElementById('db-search').value='';
   document.getElementById('db-picked-box').innerHTML = `<div class="db-picked"><span style="font-size:20px;">${p.icon}</span><span>Bruger data fra biblioteket: <b>${escapeHtml(p.name)}</b></span><button class="clear-pick" onclick="clearDbPick()">Fjern</button></div>`;
+  populateTaskFields(p.tasks);
 }
 function clearDbPick(){
   pickedDb = null;
@@ -2283,9 +2336,9 @@ function savePlant(){
     bloom: document.getElementById('plant-bloom').value.trim(),
     image: document.getElementById('plant-image').value.trim(),
     notes: document.getElementById('plant-notes').value.trim(),
-    icon: pickedDb ? pickedDb.icon : (selectedType==='blomst'?'🌸':selectedType==='busk'?'🌿':'🌳'),
+    icon: pickedDb ? pickedDb.icon : (selectedType==='blomst'?'🌸':selectedType==='busk'?'🌿':selectedType==='træ'?'🌳':'🟩'),
     desc: pickedDb ? pickedDb.desc : '',
-    tasks: pickedDb ? pickedDb.tasks : {}
+    tasks: collectTasksFromFields()
   };
   if(editingPlantId){
     const idx = gardenData.plants.findIndex(p=>p.id===editingPlantId);
@@ -2364,6 +2417,8 @@ function editPlant(id){
   document.getElementById('plant-bloom').value = p.bloom||'';
   document.getElementById('plant-image').value = p.image||'';
   document.getElementById('plant-notes').value = p.notes||'';
+  buildTaskMonthGrid();
+  populateTaskFields(p.tasks || {});
   document.getElementById('add-modal').classList.add('show');
 }
 
