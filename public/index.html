@@ -173,6 +173,13 @@
     background:#5c7a8a22;color:#3d5866;border:1px solid #5c7a8a55;padding:5px 12px;border-radius:999px;
     font-size:11.5px;font-weight:700;white-space:nowrap;
   }
+  .drought-badge{
+    padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;
+  }
+  .drought-badge.wet{background:#5c7a8a22;color:#3d5866;border:1px solid #5c7a8a55;}
+  .drought-badge.normal{background:#6f945722;color:#4a6339;border:1px solid #6f945755;}
+  .drought-badge.dry{background:#d9a44122;color:#8a6420;border:1px solid #d9a44155;}
+  .drought-badge.very-dry{background:#a85c3222;color:#8a3f1c;border:1px solid #a85c3255;}
   .weather-empty{font-size:12.5px;color:var(--soil);opacity:0.6;padding:14px 20px;}
 
   .wheel-wrap{display:flex;flex-direction:column;align-items:center;}
@@ -1132,22 +1139,48 @@ async function loadWeather(){
 
   el.innerHTML = `<div class="weather-card weather-empty">Henter vejr…</div>`;
   try{
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration&timezone=auto&forecast_days=5&past_days=30`;
     const res = await fetch(url);
     if(!res.ok) throw new Error('bad response');
     const data = await res.json();
 
     const current = data.current || {};
     const daily = data.daily || {};
-    const days = (daily.time || []).map((d,i)=>({
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    const allDays = (daily.time || []).map((d,i)=>({
       date: new Date(d),
       code: daily.weather_code[i],
       max: Math.round(daily.temperature_2m_max[i]),
-      min: Math.round(daily.temperature_2m_min[i])
+      min: Math.round(daily.temperature_2m_min[i]),
+      precip: daily.precipitation_sum ? daily.precipitation_sum[i] : null,
+      et0: daily.et0_fao_evapotranspiration ? daily.et0_fao_evapotranspiration[i] : null
     }));
 
-    const frostDay = days.find(d => d.min <= 0);
+    const forecastDays = allDays.filter(d => d.date >= today).slice(0,5);
+    const pastDays = allDays.filter(d => d.date < today);
+
+    const frostDay = forecastDays.find(d => d.min <= 0);
     const dayNames = ['Søn','Man','Tir','Ons','Tor','Fre','Lør'];
+
+    // Simple climatic water balance over the trailing 30 days (rain minus
+    // evapotranspiration) as an approximate drought indicator — Denmark has
+    // no free, key-less "real" drought index API, so this is a reasonable stand-in.
+    let droughtHtml = '';
+    const validPast = pastDays.filter(d => d.precip != null && d.et0 != null);
+    if(validPast.length >= 14){
+      const totalPrecip = validPast.reduce((s,d)=>s+d.precip, 0);
+      const totalEt0 = validPast.reduce((s,d)=>s+d.et0, 0);
+      const balance = Math.round(totalPrecip - totalEt0);
+      let label, cls, icon;
+      if(balance >= 0){ label='Fugtigt'; cls='wet'; icon='💧'; }
+      else if(balance >= -30){ label='Normalt'; cls='normal'; icon='🌱'; }
+      else if(balance >= -60){ label='Tørt'; cls='dry'; icon='🌾'; }
+      else { label='Meget tørt'; cls='very-dry'; icon='🏜️'; }
+      droughtHtml = `<div class="drought-badge ${cls}" title="Nedbør minus fordampning, seneste ${validPast.length} dage">
+          ${icon} Tørkeindeks: ${label} (${balance>0?'+':''}${balance} mm/30 dage)
+        </div>`;
+    }
 
     el.innerHTML = `<div class="weather-card">
         <div class="weather-now">
@@ -1158,13 +1191,16 @@ async function loadWeather(){
           </div>
         </div>
         <div class="weather-days">
-          ${days.map(d=>`<div class="weather-day">
+          ${forecastDays.map(d=>`<div class="weather-day">
               <div class="d">${dayNames[d.date.getDay()]}</div>
               <div class="i">${weatherIcon(d.code)}</div>
               <div class="t">${d.max}° <small>${d.min}°</small></div>
             </div>`).join('')}
         </div>
-        ${frostDay ? `<div class="frost-badge">❄️ Frostrisiko ${dayNames[frostDay.date.getDay()]}</div>` : ''}
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+          ${frostDay ? `<div class="frost-badge">❄️ Frostrisiko ${dayNames[frostDay.date.getDay()]}</div>` : ''}
+          ${droughtHtml}
+        </div>
       </div>`;
   }catch(e){
     el.innerHTML = `<div class="weather-card weather-empty">Kunne ikke hente vejrdata lige nu</div>`;
