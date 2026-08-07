@@ -123,6 +123,9 @@ Mange gratis mailudbydere (Gmail, Outlook m.fl.) kræver et separat "app passwor
 
 Hver bruger slår selv påmindelser til/fra og angiver sin e-mail under ⚙ Indstillinger inde i appen.
 
+## Admin-overblik (valgfrit)
+Sæt `ADMIN_USERNAME=dit-brugernavn` i `.env` for at give netop den konto adgang til et lille read-only overblik (🛠-ikon i toppen) over alle brugere, haver og lagerforbrug. Efterlad tom for at slå det fra.
+
 ## Opdatering af appen senere
 ```bash
 systemctl stop havehjulet

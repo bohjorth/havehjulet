@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const cron = require('node-cron');
+const rateLimit = require('express-rate-limit');
 const { readDb, writeDb } = require('./db');
 const { sendMail } = require('./mailer');
 
@@ -15,11 +16,23 @@ const PERENUAL_API_KEY = process.env.PERENUAL_API_KEY || '';
 const TREFLE_API_KEY = process.env.TREFLE_API_KEY || '';
 const PLANTNET_API_KEY = process.env.PLANTNET_API_KEY || '';
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
+const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Applied to login/register/forgot-password — slows down password-guessing
+// and email-enumeration attempts without needing any extra infrastructure.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'For mange forsøg — vent et kvarter og prøv igen.' }
+});
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -57,6 +70,11 @@ function authMiddleware(req, res, next){
   const db = readDb();
   const session = db.sessions[token];
   if(!session) return res.status(401).json({ error: 'Session udløbet, log ind igen' });
+  if(session.expires && session.expires < Date.now()){
+    delete db.sessions[token];
+    writeDb(db);
+    return res.status(401).json({ error: 'Session udløbet, log ind igen' });
+  }
   req.username = session.username;
   const { gardenId, migrated } = resolveGardenId(db, session.username);
   req.gardenId = gardenId;
@@ -64,8 +82,15 @@ function authMiddleware(req, res, next){
   next();
 }
 
+function adminOnly(req, res, next){
+  if(!ADMIN_USERNAME || req.username !== ADMIN_USERNAME){
+    return res.status(403).json({ error: 'Kun for admin' });
+  }
+  next();
+}
+
 // ---------- Auth ----------
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
   const username = String(req.body.username || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   const email = String(req.body.email || '').trim().toLowerCase();
@@ -105,7 +130,7 @@ app.post('/api/register', async (req, res) => {
   res.json({ ok: true, joinedSharedGarden: !!inviteCode });
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   const username = String(req.body.username || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   const db = readDb();
@@ -114,7 +139,7 @@ app.post('/api/login', async (req, res) => {
   const ok = await bcrypt.compare(password, user.hash);
   if(!ok) return res.status(401).json({ error: 'Forkert adgangskode' });
   const token = crypto.randomBytes(32).toString('hex');
-  db.sessions[token] = { username, createdAt: Date.now() };
+  db.sessions[token] = { username, createdAt: Date.now(), expires: Date.now() + SESSION_MAX_AGE_MS };
   writeDb(db);
   res.json({ token });
 });
@@ -129,7 +154,7 @@ app.post('/api/logout', authMiddleware, (req, res) => {
 });
 
 app.get('/api/me', authMiddleware, (req, res) => {
-  res.json({ username: req.username });
+  res.json({ username: req.username, isAdmin: !!ADMIN_USERNAME && req.username === ADMIN_USERNAME });
 });
 
 // ---------- Account settings (email, reminders) ----------
@@ -233,7 +258,7 @@ app.put('/api/garden', authMiddleware, (req, res) => {
 });
 
 // ---------- Forgot / reset password ----------
-app.post('/api/forgot-password', async (req, res) => {
+app.post('/api/forgot-password', authLimiter, async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   // Always respond the same way whether or not the email exists, so this
   // endpoint can't be used to check which addresses have an account.
@@ -428,6 +453,47 @@ app.post('/api/reminders/send-test', authMiddleware, async (req, res) => {
 // 08:00 on the 1st of every month
 cron.schedule('0 8 1 * *', () => {
   runMonthlyReminders().catch(err => console.error('Fejl i månedlig påmindelse:', err));
+});
+
+// ---------- Admin overview (read-only) ----------
+function dirSizeBytes(dir){
+  let total = 0;
+  try{
+    for(const f of fs.readdirSync(dir)){
+      const stat = fs.statSync(path.join(dir, f));
+      if(stat.isFile()) total += stat.size;
+    }
+  }catch(e){}
+  return total;
+}
+
+app.get('/api/admin/stats', authMiddleware, adminOnly, (req, res) => {
+  const db = readDb();
+  const users = Object.keys(db.users).map(u => ({
+    username: u,
+    email: db.users[u].email || null,
+    createdAt: db.users[u].createdAt || null,
+    gardenId: db.users[u].gardenId || u
+  }));
+  const gardens = Object.keys(db.gardens).map(gid => ({
+    gardenId: gid,
+    members: db.gardens[gid].members || [],
+    plantCount: (db.gardens[gid].plants || []).length,
+    pestCount: (db.gardens[gid].pests || []).length,
+    addressCount: (db.gardens[gid].addresses || []).length
+  }));
+  const totalPlants = gardens.reduce((s,g)=>s+g.plantCount, 0);
+  const uploadsBytes = dirSizeBytes(UPLOADS_DIR);
+
+  res.json({
+    totalUsers: users.length,
+    totalGardens: gardens.length,
+    totalPlants,
+    activeSessions: Object.keys(db.sessions).length,
+    uploadsMB: Math.round(uploadsBytes/1024/1024*10)/10,
+    users,
+    gardens
+  });
 });
 
 app.listen(PORT, () => {

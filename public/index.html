@@ -188,6 +188,21 @@
   }
   .badge-chip.earned{opacity:1;background:var(--moss);color:var(--parchment);border-color:var(--moss);}
   .badge-chip .n{font-size:15px;}
+  .suggest-section{margin-top:18px;}
+  .suggest-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+  .suggest-head h4{margin:0;font-size:14px;color:var(--moss);}
+  .suggest-filters{display:flex;gap:6px;}
+  .suggest-filters button{border:1.5px solid var(--line);background:#fffdf6;color:var(--soil);padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:600;}
+  .suggest-filters button.active{background:var(--moss);color:var(--parchment);border-color:var(--moss);}
+  .suggest-row{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 10px;}
+  .suggest-card{
+    flex:0 0 auto;width:150px;background:var(--parchment-2);border:1px solid var(--line);border-radius:12px;
+    padding:14px;cursor:pointer;transition:transform .12s, box-shadow .12s;
+  }
+  .suggest-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+  .suggest-card .ic{font-size:26px;margin-bottom:6px;}
+  .suggest-card b{display:block;font-size:13px;color:var(--ink);margin-bottom:4px;}
+  .suggest-card .task{font-size:11px;color:var(--clay);font-weight:600;line-height:1.4;}
 
   .wheel-wrap{display:flex;flex-direction:column;align-items:center;}
   .wheel-wrap svg{overflow:visible;}
@@ -539,6 +554,7 @@
     </nav>
     <div class="topbar-right">
       <span class="user-pill" id="user-pill"></span>
+      <button class="logout-btn" id="admin-btn" onclick="openAdminModal()" title="Admin" style="display:none;">🛠</button>
       <button class="logout-btn" onclick="openSettingsModal()" title="Indstillinger">⚙</button>
       <button class="logout-btn" onclick="handleLogout()">Log ud</button>
     </div>
@@ -557,6 +573,7 @@
 
       <div id="weather-widget"></div>
       <div id="badges-widget"></div>
+      <div id="planting-suggestions"></div>
 
       <div class="dash-grid">
         <div class="wheel-wrap">
@@ -729,6 +746,17 @@
       <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
     </div>
     <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ===== ADMIN MODAL ===== -->
+<div class="modal-overlay" id="admin-modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <h3>🛠 Admin-overblik</h3>
+      <button class="modal-close" onclick="closeModal('admin-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="admin-body">Indlæser…</div>
   </div>
 </div>
 
@@ -1145,6 +1173,7 @@ function toast(msg){
 // ---------- API helper ----------
 const API_BASE = '/api';
 let authToken = localStorage.getItem('havehjulet_token') || null;
+let currentUserIsAdmin = false;
 
 async function apiFetch(path, opts={}){
   const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
@@ -1203,6 +1232,7 @@ async function handleLogin(){
     authToken = data.token;
     localStorage.setItem('havehjulet_token', authToken);
     currentUser = username;
+    try{ const me = await apiFetch('/me'); currentUserIsAdmin = !!me.isAdmin; }catch(e){}
     await loadGarden();
     enterApp();
   }catch(e){
@@ -1213,6 +1243,7 @@ async function handleLogin(){
 function handleLogout(){
   currentUser = null;
   authToken = null;
+  currentUserIsAdmin = false;
   localStorage.removeItem('havehjulet_token');
   gardenData = { center:null, zoom:null, plants:[] };
   document.getElementById('app-shell').style.display='none';
@@ -1245,6 +1276,7 @@ async function tryAutoLogin(){
   try{
     const me = await apiFetch('/me');
     currentUser = me.username;
+    currentUserIsAdmin = !!me.isAdmin;
     await loadGarden();
     enterApp();
   }catch(e){
@@ -1258,6 +1290,7 @@ function enterApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-shell').style.display='flex';
   document.getElementById('user-pill').textContent = '@' + currentUser;
+  document.getElementById('admin-btn').style.display = currentUserIsAdmin ? 'inline-block' : 'none';
   buildYearWheel();
   selectMonth(currentMonthIndex(), true);
   document.getElementById('today-label').textContent = new Date().toLocaleDateString('da-DK', {day:'numeric', month:'long', year:'numeric'});
@@ -1266,6 +1299,7 @@ function enterApp(){
   renderAddressList();
   loadWeather();
   renderBadges();
+  renderPlantingSuggestions();
   tryOpenDeepLinkedPlant();
 }
 
@@ -1371,6 +1405,100 @@ async function loadWeather(){
 }
 
 // ---------- Settings (account, reminders, shared garden) ----------
+// ---------- Backup export/import ----------
+function exportGardenJson(){
+  const blob = new Blob([JSON.stringify(gardenData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `havehjulet-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Havedata downloadet');
+}
+
+async function importGardenJson(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if(!Array.isArray(parsed.plants)){
+      toast('Filen ligner ikke en gyldig Havehjulet-backup');
+      return;
+    }
+    const count = parsed.plants.length;
+    if(!confirm(`Dette overskriver din nuværende have med indholdet af filen (${count} planter). Fortsæt?`)) return;
+    gardenData = parsed;
+    if(!gardenData.plants) gardenData.plants = [];
+    if(!gardenData.addresses) gardenData.addresses = [];
+    await saveGarden();
+    renderMarkers(); renderAddressMarkers(); renderPestMarkers();
+    renderJournal(); renderAddressList(); buildYearWheel(); loadWeather(); renderBadges();
+    closeModal('settings-modal');
+    toast('Havedata importeret');
+  }catch(err){
+    toast('Kunne ikke læse filen — er det gyldig JSON?');
+  }
+}
+
+
+// ---------- Admin overview ----------
+async function openAdminModal(){
+  const body = document.getElementById('admin-body');
+  body.innerHTML = 'Indlæser…';
+  document.getElementById('admin-modal').classList.add('show');
+  try{
+    const s = await apiFetch('/admin/stats');
+    const usersRows = s.users.map(u=>`
+      <tr>
+        <td>${escapeHtml(u.username)}</td>
+        <td>${u.email ? escapeHtml(u.email) : '<span style="opacity:0.4;">—</span>'}</td>
+        <td class="mono" style="font-size:11px;">${u.createdAt ? new Date(u.createdAt).toLocaleDateString('da-DK') : '—'}</td>
+        <td class="mono" style="font-size:11px;">${escapeHtml(u.gardenId)}</td>
+      </tr>`).join('');
+    const gardenRows = s.gardens.map(g=>`
+      <tr>
+        <td class="mono" style="font-size:11px;">${escapeHtml(g.gardenId)}</td>
+        <td>${g.members.map(escapeHtml).join(', ') || '—'}</td>
+        <td>${g.plantCount}</td>
+        <td>${g.pestCount}</td>
+      </tr>`).join('');
+    body.innerHTML = `
+      <div class="detail-stats" style="margin-bottom:18px;">
+        <div>Brugere<b>${s.totalUsers}</b></div>
+        <div>Haver<b>${s.totalGardens}</b></div>
+        <div>Planter i alt<b>${s.totalPlants}</b></div>
+        <div>Aktive sessioner<b>${s.activeSessions}</b></div>
+        <div>Uploads<b>${s.uploadsMB} MB</b></div>
+      </div>
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--moss);">Brugere</h4>
+      <div style="overflow-x:auto;margin-bottom:18px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead><tr style="text-align:left;opacity:0.6;font-size:11px;text-transform:uppercase;">
+            <th style="padding:4px 8px;">Brugernavn</th><th style="padding:4px 8px;">E-mail</th><th style="padding:4px 8px;">Oprettet</th><th style="padding:4px 8px;">Have</th>
+          </tr></thead>
+          <tbody>${usersRows}</tbody>
+        </table>
+      </div>
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--moss);">Haver</h4>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead><tr style="text-align:left;opacity:0.6;font-size:11px;text-transform:uppercase;">
+            <th style="padding:4px 8px;">Have-ID</th><th style="padding:4px 8px;">Medlemmer</th><th style="padding:4px 8px;">Planter</th><th style="padding:4px 8px;">Skadedyr</th>
+          </tr></thead>
+          <tbody>${gardenRows}</tbody>
+        </table>
+      </div>
+    `;
+  }catch(e){
+    body.innerHTML = `<div class="empty-note">Kunne ikke hente admin-data.</div>`;
+  }
+}
+
 async function openSettingsModal(){
   const body = document.getElementById('settings-body');
   body.innerHTML = 'Indlæser…';
@@ -1421,6 +1549,15 @@ function renderSettingsBody(acc){
       </div>
       <div class="auth-hint" style="margin-top:8px;">Bemærk: dine egne planter forbliver gemt, men du ser den delte haves kort og planter i stedet, indtil du forlader den igen.</div>
     </div>
+
+    <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
+    <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Backup</h4>
+    <div class="empty-note" style="margin-bottom:10px;">Download hele din have som en fil — praktisk som ekstra sikkerhedskopi, eller til at flytte data til en anden konto.</div>
+    <div class="modal-actions" style="margin-top:0;">
+      <button class="secondary-btn" style="flex:1;" onclick="exportGardenJson()">⬇️ Eksportér havedata</button>
+      <button class="secondary-btn" style="flex:1;" onclick="document.getElementById('import-garden-input').click()">⬆️ Importér havedata</button>
+    </div>
+    <input type="file" id="import-garden-input" accept="application/json,.json" style="display:none;" onchange="importGardenJson(event)">
   `;
 }
 
@@ -2058,6 +2195,58 @@ const BADGE_DEFS = [
   {icon:'🗓️', label:'Et helt år med Havehjulet', test:(g,acc)=> acc && acc.createdAt && (Date.now()-acc.createdAt) >= 365*24*60*60*1000}
 ];
 
+// ---------- "Hvad kan jeg plante nu?" suggestions ----------
+let suggestFilterType = 'alle';
+let pendingSuggestionName = null;
+
+function isGoodPlantingMonth(p, month){
+  const t = (p.tasks && p.tasks[month]) ? p.tasks[month].toLowerCase() : '';
+  return t.includes('plant') || t.includes('så ') || t.startsWith('så');
+}
+
+function renderPlantingSuggestions(){
+  const el = document.getElementById('planting-suggestions');
+  if(!el) return;
+  const month = currentMonthIndex();
+  let matches = PLANT_DB.filter(p => isGoodPlantingMonth(p, month));
+  if(suggestFilterType !== 'alle') matches = matches.filter(p => p.type === suggestFilterType);
+  matches = matches.slice(0, 12);
+
+  const filters = ['alle','blomst','busk','træ','plæne'];
+  const filterLabels = {alle:'Alle', blomst:'🌸 Blomst', busk:'🌿 Busk', 'træ':'🌳 Træ', 'plæne':'🟩 Plæne'};
+
+  el.innerHTML = `<div class="suggest-section">
+      <div class="suggest-head">
+        <h4>🌱 Godt tidspunkt at plante i ${MONTHS_FULL[month]}</h4>
+        <div class="suggest-filters">
+          ${filters.map(f=>`<button class="${f===suggestFilterType?'active':''}" onclick="setSuggestFilter('${f}')">${filterLabels[f]}</button>`).join('')}
+        </div>
+      </div>
+      ${matches.length ? `<div class="suggest-row">
+          ${matches.map(p=>`<div class="suggest-card" onclick="trySuggestion('${p.name.replace(/'/g,"\\'")}')">
+              <div class="ic">${p.icon}</div>
+              <b>${escapeHtml(p.name)}</b>
+              <div class="task">${escapeHtml(p.tasks[month])}</div>
+            </div>`).join('')}
+        </div>` : `<div class="empty-note">Ingen forslag i biblioteket for denne kombination lige nu.</div>`}
+    </div>`;
+}
+
+function setSuggestFilter(f){
+  suggestFilterType = f;
+  renderPlantingSuggestions();
+}
+
+function trySuggestion(name){
+  pendingSuggestionName = name;
+  switchView('map');
+  addMode = true;
+  resetAreaDrawing();
+  document.getElementById('add-toggle-btn').classList.add('active');
+  document.getElementById('add-mode-banner').classList.add('show');
+  toast(`Klik på kortet hvor din ${name.toLowerCase()} skal stå`);
+}
+
 async function renderBadges(){
   const el = document.getElementById('badges-widget');
   if(!el) return;
@@ -2228,6 +2417,11 @@ function openAddModal(){
   document.getElementById('plant-notes').value='';
   buildTaskMonthGrid();
   document.getElementById('add-modal').classList.add('show');
+  if(pendingSuggestionName){
+    const n = pendingSuggestionName;
+    pendingSuggestionName = null;
+    pickDb(n);
+  }
 }
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
