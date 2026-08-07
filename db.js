@@ -11,16 +11,17 @@ function ensureDb(){
   const dir = path.dirname(DB_PATH);
   if(!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   if(!fs.existsSync(DB_PATH)){
-    fs.writeFileSync(DB_PATH, JSON.stringify({ users:{}, sessions:{}, gardens:{}, invites:{}, resetTokens:{} }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ users:{}, sessions:{}, gardens:{}, invites:{}, resetTokens:{}, shareLinks:{} }, null, 2));
   }
 }
 
 function readDb(){
   ensureDb();
   const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-  // migrate older db files that predate invites/resetTokens
+  // migrate older db files that predate invites/resetTokens/shareLinks
   if(!data.invites) data.invites = {};
   if(!data.resetTokens) data.resetTokens = {};
+  if(!data.shareLinks) data.shareLinks = {};
   return data;
 }
 

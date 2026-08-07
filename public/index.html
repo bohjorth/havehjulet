@@ -37,7 +37,39 @@
     --line:rgba(42,38,32,0.14);
     --shadow: 0 10px 30px rgba(42,38,32,0.16);
     --radius: 14px;
+    --surface:var(--surface);
+    --surface-text:#2a2620;
   }
+  html[data-theme="dark"]{
+    --moss:#7fb867;
+    --moss-light:#96cc7e;
+    --fern:#8fbf72;
+    --clay:#e08a54;
+    --clay-light:#eda877;
+    --soil:#c9c2a8;
+    --parchment:#1c2019;
+    --parchment-2:#262b21;
+    --parchment-3:#333a2a;
+    --gold:#e8bc63;
+    --ink:#ece7d6;
+    --line:rgba(236,231,214,0.14);
+    --shadow: 0 10px 30px rgba(0,0,0,0.45);
+    --surface:#2a2f24;
+    --surface-text:#ece7d6;
+  }
+  html[data-theme="dark"] .field input,
+  html[data-theme="dark"] textarea.notes,
+  html[data-theme="dark"] .journal-search,
+  html[data-theme="dark"] #db-search,
+  html[data-theme="dark"] .addr-search input,
+  html[data-theme="dark"] .task-month-cell input,
+  html[data-theme="dark"] .db-results,
+  html[data-theme="dark"] .addr-suggestions,
+  html[data-theme="dark"] .db-result-item:hover{
+    color: var(--surface-text);
+  }
+  html[data-theme="dark"] .detail-emoji img,
+  html[data-theme="dark"] .qr-code-canvas{ filter:none; }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;}
   body{
@@ -106,7 +138,7 @@
   .field label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);margin-bottom:6px;}
   .field input{
     width:100%;padding:12px 14px;border-radius:9px;border:1.5px solid var(--line);
-    background:#fffdf6;font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s;
+    background:var(--surface);font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s;
   }
   .field input:focus{border-color:var(--fern);}
   .primary-btn{
@@ -188,11 +220,32 @@
   }
   .badge-chip.earned{opacity:1;background:var(--moss);color:var(--parchment);border-color:var(--moss);}
   .badge-chip .n{font-size:15px;}
+  .type-chart-card{background:var(--parchment-2);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-top:14px;}
+  .type-chart-card h4{margin:0 0 12px;font-size:13px;color:var(--moss);}
+  .stat-bar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--parchment-3);margin-bottom:12px;}
+  .stat-bar div{transition:flex .2s;}
+  .stat-legend{display:flex;gap:16px;flex-wrap:wrap;}
+  .stat-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soil);}
+  .stat-legend-item .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  /* Read-only shared view: hide everything that mutates data */
+  body.view-only-mode #tab-dash,
+  body.view-only-mode #add-toggle-btn,
+  body.view-only-mode #area-toggle-btn,
+  body.view-only-mode #pest-toggle-btn,
+  body.view-only-mode #save-addr-btn,
+  body.view-only-mode #trash-btn,
+  body.view-only-mode #admin-btn,
+  body.view-only-mode #settings-btn,
+  body.view-only-mode #logout-btn,
+  body.view-only-mode .journal-foot{ display:none !important; }
+  .view-only-banner{
+    background:var(--gold);color:var(--ink);text-align:center;padding:7px;font-size:12.5px;font-weight:700;
+  }
   .suggest-section{margin-top:18px;}
   .suggest-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
   .suggest-head h4{margin:0;font-size:14px;color:var(--moss);}
   .suggest-filters{display:flex;gap:6px;}
-  .suggest-filters button{border:1.5px solid var(--line);background:#fffdf6;color:var(--soil);padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:600;}
+  .suggest-filters button{border:1.5px solid var(--line);background:var(--surface);color:var(--soil);padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:600;}
   .suggest-filters button.active{background:var(--moss);color:var(--parchment);border-color:var(--moss);}
   .suggest-row{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 10px;}
   .suggest-card{
@@ -212,7 +265,7 @@
   .wedge-label{font-family:'JetBrains Mono',monospace;font-weight:600;pointer-events:none;user-select:none;}
   .wedge-count{pointer-events:none;user-select:none;}
   .wheel-center-label{font-family:'Fraunces',serif;font-weight:600;}
-  .reset-month{margin-top:14px;font-size:12.5px;border:1.5px solid var(--line);background:#fffdf6;color:var(--soil);padding:7px 16px;border-radius:999px;font-weight:600;}
+  .reset-month{margin-top:14px;font-size:12.5px;border:1.5px solid var(--line);background:var(--surface);color:var(--soil);padding:7px 16px;border-radius:999px;font-weight:600;}
   .reset-month:hover{border-color:var(--fern);color:var(--fern);}
 
   .task-panel{background:var(--parchment-2);border:1px solid var(--line);border-radius:var(--radius);padding:26px 28px;min-height:400px;}
@@ -221,7 +274,7 @@
   .task-group{margin-bottom:22px;}
   .task-group h4{font-size:12.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);opacity:0.7;margin:0 0 10px;font-weight:600;}
   .task-item{
-    display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:#fffdf6;border-radius:9px;margin-bottom:8px;border:1px solid var(--line);
+    display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:var(--surface);border-radius:9px;margin-bottom:8px;border:1px solid var(--line);
   }
   .task-item .icon{font-size:18px;flex-shrink:0;}
   .task-item .txt{font-size:13.8px;line-height:1.4;}
@@ -234,7 +287,7 @@
   .journal{background:var(--parchment-2);display:flex;flex-direction:column;border-right:1px solid var(--line);}
   .journal-head{padding:18px 18px 12px;border-bottom:1px solid var(--line);}
   .journal-head h3{margin:0 0 10px;font-size:16px;color:var(--moss);}
-  .journal-search{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--line);font-size:13px;background:#fffdf6;}
+  .journal-search{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--line);font-size:13px;background:var(--surface);}
   .journal-list{flex:1;overflow-y:auto;padding:8px 10px;}
   .journal-item{
     display:flex;gap:10px;align-items:flex-start;padding:10px 10px;border-radius:9px;margin-bottom:4px;cursor:pointer;transition:background .12s;
@@ -261,7 +314,7 @@
     position:absolute;top:14px;left:14px;right:14px;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;
   }
   .addr-search{
-    flex:1;min-width:220px;display:flex;background:#fffdf6;border-radius:9px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line);
+    flex:1;min-width:220px;display:flex;background:var(--surface);border-radius:9px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line);
   }
   .addr-search input{flex:1;border:none;padding:11px 13px;font-size:13.5px;outline:none;background:transparent;}
   .addr-search button{border:none;background:var(--moss);color:var(--parchment);padding:0 16px;font-size:13px;font-weight:600;}
@@ -270,7 +323,7 @@
   }
   .toggle-add-btn.active{background:var(--gold);color:var(--ink);}
   .addr-suggestions{
-    position:absolute;top:100%;left:0;right:0;background:#fffdf6;border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:var(--shadow);z-index:1001;
+    position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:var(--shadow);z-index:1001;
   }
   .addr-suggestions div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);}
   .addr-suggestions div:last-child{border-bottom:none;}
@@ -287,7 +340,7 @@
   .add-mode-banner .mini-btn.cancel{background:rgba(42,38,32,0.15);color:var(--ink);}
 
   .leaflet-tooltip.plant-tip{
-    background:#fffdf6;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:0;overflow:hidden;
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:0;overflow:hidden;
   }
   .tip-inner{padding:8px 10px;max-width:190px;}
   .tip-inner .tip-img{font-size:26px;line-height:1;margin-bottom:4px;}
@@ -310,12 +363,12 @@
   .modal-body{padding:22px 24px;}
   .type-choice{display:flex;gap:8px;margin-bottom:16px;}
   .type-choice button{
-    flex:1;border:1.5px solid var(--line);background:#fffdf6;padding:10px 8px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--soil);
+    flex:1;border:1.5px solid var(--line);background:var(--surface);padding:10px 8px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--soil);
   }
   .type-choice button.active{border-color:var(--moss);background:var(--moss);color:var(--parchment);}
   .db-search-wrap{position:relative;margin-bottom:16px;}
   .db-results{
-    border:1px solid var(--line);border-radius:9px;background:#fffdf6;max-height:340px;overflow-y:auto;margin-top:6px;display:none;
+    border:1px solid var(--line);border-radius:9px;background:var(--surface);max-height:340px;overflow-y:auto;margin-top:6px;display:none;
   }
   .db-results.show{display:block;}
   .db-result-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
@@ -326,14 +379,14 @@
   }
   .db-picked .clear-pick{margin-left:auto;border:none;background:transparent;color:var(--clay);font-size:12px;font-weight:600;}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  textarea.notes{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid var(--line);background:#fffdf6;font-size:13.5px;min-height:70px;resize:vertical;}
+  textarea.notes{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:13.5px;min-height:70px;resize:vertical;}
   .modal-actions{display:flex;gap:10px;margin-top:18px;}
   .secondary-btn{flex:1;background:transparent;border:1.5px solid var(--line);color:var(--soil);border-radius:9px;padding:12px;font-size:13.5px;font-weight:600;}
   .secondary-btn:hover{border-color:var(--clay);color:var(--clay);}
   .modal .primary-btn{flex:1.4;margin-top:0;}
   .task-month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .task-month-cell label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--clay);margin-bottom:3px;}
-  .task-month-cell input{width:100%;padding:8px 9px;border-radius:7px;border:1.5px solid var(--line);background:#fffdf6;font-size:12.5px;}
+  .task-month-cell input{width:100%;padding:8px 9px;border-radius:7px;border:1.5px solid var(--line);background:var(--surface);font-size:12.5px;}
   .task-month-cell input:focus{border-color:var(--fern);outline:none;}
 
   /* detail modal */
@@ -358,8 +411,8 @@
   .photo-thumb{position:relative;flex:0 0 auto;width:74px;text-align:center;}
   .photo-thumb img{width:74px;height:74px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid var(--line);display:block;}
   .photo-thumb .pdate{font-size:9.5px;color:var(--soil);opacity:0.65;margin-top:3px;font-family:'JetBrains Mono',monospace;}
-  .photo-thumb .pdel{position:absolute;top:-5px;right:-5px;background:#a83223;color:#fff;border:2px solid #fffdf6;border-radius:50%;width:18px;height:18px;font-size:10px;line-height:1;cursor:pointer;padding:0;}
-  .add-photo-btn{flex:0 0 auto;width:74px;height:74px;border-radius:9px;border:1.5px dashed var(--line);background:#fffdf6;color:var(--soil);opacity:0.6;font-size:22px;cursor:pointer;}
+  .photo-thumb .pdel{position:absolute;top:-5px;right:-5px;background:#a83223;color:#fff;border:2px solid var(--surface);border-radius:50%;width:18px;height:18px;font-size:10px;line-height:1;cursor:pointer;padding:0;}
+  .add-photo-btn{flex:0 0 auto;width:74px;height:74px;border-radius:9px;border:1.5px dashed var(--line);background:var(--surface);color:var(--soil);opacity:0.6;font-size:22px;cursor:pointer;}
   .add-photo-btn:hover{opacity:1;border-color:var(--fern);}
   .slideshow-btn{border:none;background:none;color:var(--clay);font-size:11.5px;font-weight:700;cursor:pointer;text-decoration:underline;}
   .delete-plant-btn{color:#a83223;border-color:#e2c3ba;}
@@ -370,6 +423,9 @@
     box-shadow:var(--shadow);z-index:3000;opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .undo-toast{display:flex;align-items:center;gap:14px;background:var(--soil);}
+  .undo-toast.show{pointer-events:auto;}
+  .undo-toast button{background:var(--gold);color:var(--ink);border:none;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;}
   /* ===== MOBILE ===== */
   @media (max-width: 640px){
     body{-webkit-tap-highlight-color:transparent;}
@@ -417,9 +473,20 @@
     body *{visibility:hidden;}
     #qr-print-area, #qr-print-area *{visibility:visible;}
     #qr-print-area{position:fixed;top:20px;left:50%;transform:translateX(-50%);}
+    body.print-map-mode #map, body.print-map-mode #map *{visibility:visible;}
+    body.print-map-mode #map{position:fixed;top:0;left:0;width:100%;height:100%;}
   }
 </style>
 </head>
+<script>
+  // Applied before first paint to avoid a light-mode flash on load.
+  (function(){
+    try{
+      const saved = localStorage.getItem('havehjulet_theme');
+      if(saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+    }catch(e){}
+  })();
+</script>
 <body>
 <div class="field-texture"></div>
 
@@ -536,6 +603,7 @@
 
 <!-- ============ APP SHELL ============ -->
 <div id="app-shell">
+  <div class="view-only-banner" id="view-only-banner" style="display:none;">👀 Delt visning af en have — kun til at kigge på. Lav din egen på Havehjulet!</div>
   <header class="topbar">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 42 42" fill="none">
@@ -555,8 +623,9 @@
     <div class="topbar-right">
       <span class="user-pill" id="user-pill"></span>
       <button class="logout-btn" id="admin-btn" onclick="openAdminModal()" title="Admin" style="display:none;">🛠</button>
-      <button class="logout-btn" onclick="openSettingsModal()" title="Indstillinger">⚙</button>
-      <button class="logout-btn" onclick="handleLogout()">Log ud</button>
+      <button class="logout-btn" id="theme-toggle-btn" onclick="toggleDarkMode()" title="Mørkt/lyst tema">🌙</button>
+      <button class="logout-btn" id="settings-btn" onclick="openSettingsModal()" title="Indstillinger">⚙</button>
+      <button class="logout-btn" id="logout-btn" onclick="handleLogout()">Log ud</button>
     </div>
   </header>
 
@@ -573,6 +642,7 @@
 
       <div id="weather-widget"></div>
       <div id="badges-widget"></div>
+      <div id="type-chart-widget"></div>
       <div id="planting-suggestions"></div>
 
       <div class="dash-grid">
@@ -603,11 +673,17 @@
           <div class="journal-head">
             <h3>Mine planter</h3>
             <input class="journal-search" id="journal-search" placeholder="Søg blandt dine planter…" oninput="renderJournal()">
+            <div class="suggest-filters" id="journal-type-filters" style="margin-top:8px;flex-wrap:wrap;"></div>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:var(--soil);cursor:pointer;">
+              <input type="checkbox" id="journal-bloom-only" style="width:auto;" onchange="renderJournal()"> Kun de der blomstrer nu
+            </label>
           </div>
           <div class="journal-list" id="journal-list"></div>
           <div class="journal-foot">
             <div class="today-mono" style="opacity:0.6;font-size:11px;margin-bottom:10px;">Klik “Tilføj plante” og peg på kortet</div>
-            <button class="secondary-btn" style="width:100%;" onclick="exportGardenPdf()">📄 Eksportér haveplan som PDF</button>
+            <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="exportGardenPdf()">📄 Eksportér haveplan som PDF</button>
+            <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="exportGardenCsv()">📊 Eksportér som CSV</button>
+            <button class="secondary-btn" id="trash-btn" style="width:100%;" onclick="openTrashModal()">🗑 Papirkurv</button>
           </div>
         </div>
         <div class="map-col">
@@ -618,12 +694,13 @@
               <button onclick="searchAddress()">Søg</button>
               <div class="addr-suggestions" id="addr-suggestions"></div>
             </div>
-            <button class="toggle-add-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
+            <button class="toggle-add-btn" id="save-addr-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
             <button class="toggle-add-btn" id="add-toggle-btn" onclick="toggleAddMode()">+ Tilføj plante</button>
             <button class="toggle-add-btn" id="area-toggle-btn" onclick="toggleAreaMode()">▱ Tilføj bed</button>
             <button class="toggle-add-btn" id="sun-toggle-btn" onclick="toggleSunOverlay()">☀️ Sol</button>
             <button class="toggle-add-btn" id="pest-toggle-btn" onclick="togglePestMode()">🐌 Skadedyr</button>
             <button class="toggle-add-btn" id="bloom-toggle-btn" onclick="toggleBloomFilter()">🌸 Blomstrer nu</button>
+            <button class="toggle-add-btn" style="background:var(--soil);" onclick="printMap()">🖨️ Print kort</button>
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
           <div class="add-mode-banner" id="area-mode-banner"></div>
@@ -749,6 +826,17 @@
   </div>
 </div>
 
+<!-- ===== TRASH MODAL ===== -->
+<div class="modal-overlay" id="trash-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>🗑 Papirkurv</h3>
+      <button class="modal-close" onclick="closeModal('trash-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="trash-body"></div>
+  </div>
+</div>
+
 <!-- ===== ADMIN MODAL ===== -->
 <div class="modal-overlay" id="admin-modal">
   <div class="modal" style="max-width:640px;">
@@ -854,6 +942,7 @@
 
 <input type="file" id="plant-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePlantPhotoUpload(event)">
 <div class="toast" id="toast"></div>
+<div class="toast undo-toast" id="undo-toast"><span id="undo-toast-text"></span><button onclick="handleUndoClick()">↩ Fortryd</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1260,6 +1349,8 @@ async function loadGarden(){
   }
   if(!gardenData.plants) gardenData.plants = [];
   if(!gardenData.addresses) gardenData.addresses = [];
+  if(!gardenData.trash) gardenData.trash = [];
+  if(purgeOldTrash()) saveGarden();
 }
 
 async function saveGarden(){
@@ -1291,6 +1382,7 @@ function enterApp(){
   document.getElementById('app-shell').style.display='flex';
   document.getElementById('user-pill').textContent = '@' + currentUser;
   document.getElementById('admin-btn').style.display = currentUserIsAdmin ? 'inline-block' : 'none';
+  applyThemeIcon();
   buildYearWheel();
   selectMonth(currentMonthIndex(), true);
   document.getElementById('today-label').textContent = new Date().toLocaleDateString('da-DK', {day:'numeric', month:'long', year:'numeric'});
@@ -1299,7 +1391,9 @@ function enterApp(){
   renderAddressList();
   loadWeather();
   renderBadges();
+  renderTypeChart();
   renderPlantingSuggestions();
+  updateTrashButton();
   tryOpenDeepLinkedPlant();
 }
 
@@ -1437,7 +1531,7 @@ async function importGardenJson(e){
     if(!gardenData.addresses) gardenData.addresses = [];
     await saveGarden();
     renderMarkers(); renderAddressMarkers(); renderPestMarkers();
-    renderJournal(); renderAddressList(); buildYearWheel(); loadWeather(); renderBadges();
+    renderJournal(); renderAddressList(); buildYearWheel(); loadWeather(); renderBadges(); renderTypeChart();
     closeModal('settings-modal');
     toast('Havedata importeret');
   }catch(err){
@@ -1551,6 +1645,15 @@ function renderSettingsBody(acc){
     </div>
 
     <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
+    <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Delt visningslink</h4>
+    <div class="empty-note" style="margin-bottom:10px;">Et rent kigge-link til fx familie — ingen konto nødvendig, og de kan ikke ændre noget.</div>
+    <div class="modal-actions" style="margin-top:0;">
+      <button class="secondary-btn" style="flex:1;" onclick="showViewLink()">🔗 Vis/opret link</button>
+      <button class="secondary-btn delete-plant-btn" style="flex:1;" onclick="revokeViewLink()">Deaktivér link</button>
+    </div>
+    <div id="view-link-box"></div>
+
+    <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
     <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Backup</h4>
     <div class="empty-note" style="margin-bottom:10px;">Download hele din have som en fil — praktisk som ekstra sikkerhedskopi, eller til at flytte data til en anden konto.</div>
     <div class="modal-actions" style="margin-top:0;">
@@ -1580,6 +1683,30 @@ async function sendTestReminder(){
     toast('Test-mail sendt (tjek din indbakke om lidt)');
   }catch(e){
     toast(e.message || 'Kunne ikke sende test-mail');
+  }
+}
+
+async function showViewLink(){
+  try{
+    const res = await apiFetch('/garden/share');
+    const url = res.viewUrl || `${window.location.origin}/?view=${res.token}`;
+    document.getElementById('view-link-box').innerHTML = `
+      <div class="db-picked" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <span>Del dette link — ingen login nødvendig for at kigge:</span>
+        <span class="mono" style="font-size:12px;word-break:break-all;user-select:all;">${escapeHtml(url)}</span>
+      </div>`;
+  }catch(e){
+    toast('Kunne ikke hente visningslink');
+  }
+}
+async function revokeViewLink(){
+  if(!confirm('Deaktivér det delte visningslink? Et evt. eksisterende link vil stoppe med at virke.')) return;
+  try{
+    await apiFetch('/garden/share/revoke', {method:'POST'});
+    document.getElementById('view-link-box').innerHTML = '';
+    toast('Visningslink deaktiveret');
+  }catch(e){
+    toast('Kunne ikke deaktivere linket');
   }
 }
 
@@ -1673,9 +1800,45 @@ async function handleResetPassword(){
 
 // handle ?reset=TOKEN and ?join=CODE in the URL on page load
 let deepLinkPlantId = null;
+let viewOnlyMode = false;
+
+async function enterViewOnlyMode(token){
+  try{
+    const res = await fetch(`/api/public/garden/${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Linket virker ikke');
+
+    viewOnlyMode = true;
+    gardenData = data.garden || {center:null, zoom:null, plants:[], addresses:[]};
+    if(!gardenData.plants) gardenData.plants = [];
+    if(!gardenData.addresses) gardenData.addresses = [];
+    gardenData.pests = [];
+
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'flex';
+    document.body.classList.add('view-only-mode');
+    document.getElementById('view-only-banner').style.display = 'block';
+    document.getElementById('user-pill').textContent = '👀 Delt visning';
+    applyThemeIcon();
+    switchView('map');
+    initMapIfNeeded();
+    renderJournal();
+    renderAddressList();
+  }catch(e){
+    const hero = document.querySelector('.auth-form-side');
+    if(hero){
+      hero.innerHTML = `<div class="auth-msg show error">Dette delte link virker ikke længere. Spørg den der delte det med dig om et nyt link.</div>`;
+    }
+  }
+}
 
 (function handleUrlParams(){
   const params = new URLSearchParams(window.location.search);
+  const viewToken = params.get('view');
+  if(viewToken){
+    enterViewOnlyMode(viewToken);
+    return;
+  }
   const resetToken = params.get('reset');
   const joinCode = params.get('join');
   const plantId = params.get('plant');
@@ -2177,6 +2340,48 @@ function renderMarkers(){
 }
 
 // ---------- Journal ----------
+// ---------- Companion planting warnings ----------
+// A modest, well-documented set of antagonistic pairings — not exhaustive,
+// just enough to flag the most common mistakes among plants in our library.
+const COMPANION_CONFLICTS = [
+  { pair: ['Valnøddetræ','Rhododendron'], note: 'Valnød afgiver juglon, som væksthæmmer rhododendron.' },
+  { pair: ['Valnøddetræ','Azalea'], note: 'Valnød afgiver juglon, som væksthæmmer azalea.' },
+  { pair: ['Valnøddetræ','Pæon'], note: 'Valnød afgiver juglon, som væksthæmmer pæon.' },
+  { pair: ['Valnøddetræ','Klematis'], note: 'Valnød afgiver juglon, som væksthæmmer klematis.' },
+  { pair: ['Valnøddetræ','Syren'], note: 'Valnød afgiver juglon, som kan hæmme syren.' },
+  { pair: ['Valnøddetræ','Æbletræ'], note: 'Valnød afgiver juglon, som kan hæmme æbletræer.' },
+  { pair: ['Valnøddetræ','Tulipan'], note: 'Valnød afgiver juglon, som kan hæmme løgblomster i rodzonen.' },
+  { pair: ['Skovfyr','Lavendel'], note: 'Nåletræer forsurer jorden over tid — lavendel foretrækker kalkholdig, basisk jord.' },
+  { pair: ['Rødgran','Lavendel'], note: 'Nåletræer forsurer jorden over tid — lavendel foretrækker kalkholdig, basisk jord.' },
+  { pair: ['Ædelgran','Lavendel'], note: 'Nåletræer forsurer jorden over tid — lavendel foretrækker kalkholdig, basisk jord.' },
+  { pair: ['Birk','Rhododendron'], note: 'Birk har tætte, grådige rødder tæt under overfladen, som konkurrerer hårdt om vand og næring.' }
+];
+const COMPANION_RADIUS_M = 5;
+
+function haversineMeters(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const toRad = d => d*Math.PI/180;
+  const dLat = toRad(lat2-lat1), dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function findCompanionWarnings(name, lat, lng, excludeId){
+  if(lat==null || lng==null) return [];
+  const warnings = [];
+  gardenData.plants.forEach(other=>{
+    if(other.id === excludeId) return;
+    if(haversineMeters(lat, lng, other.lat, other.lng) > COMPANION_RADIUS_M) return;
+    COMPANION_CONFLICTS.forEach(c=>{
+      const [a,b] = c.pair;
+      if((name===a && other.name===b) || (name===b && other.name===a)){
+        warnings.push(`${a} og ${b} står tæt (< ${COMPANION_RADIUS_M} m): ${c.note}`);
+      }
+    });
+  });
+  return warnings;
+}
+
 const BEE_FRIENDLY_NAMES = new Set([
   'Lavendel','Solsikke','Kornel','Hyld','Kaprifolium','Blåbær','Lind','Klematis','Syren','Æbletræ',
   'Prydkirsebær','Rhododendron','Kornblomst','Valmue','Lupin','Storkenæb','Løvefod','Jasmin','Vedbend',
@@ -2247,6 +2452,30 @@ function trySuggestion(name){
   toast(`Klik på kortet hvor din ${name.toLowerCase()} skal stå`);
 }
 
+function renderTypeChart(){
+  const el = document.getElementById('type-chart-widget');
+  if(!el) return;
+  const total = gardenData.plants.length;
+  if(!total){ el.innerHTML = ''; return; }
+  const types = ['blomst','busk','træ','plæne'];
+  const counts = {};
+  types.forEach(t => counts[t] = gardenData.plants.filter(p=>p.type===t).length);
+
+  const bar = types.filter(t=>counts[t]>0).map(t =>
+    `<div style="flex:${counts[t]};background:${TYPE_COLOR[t]};" title="${TYPE_LABEL[t]}: ${counts[t]}"></div>`
+  ).join('');
+
+  const legend = types.filter(t=>counts[t]>0).map(t =>
+    `<div class="stat-legend-item"><span class="dot" style="background:${TYPE_COLOR[t]};"></span>${TYPE_LABEL[t]}: ${counts[t]} (${Math.round(counts[t]/total*100)}%)</div>`
+  ).join('');
+
+  el.innerHTML = `<div class="type-chart-card">
+      <h4>📊 Din have fordelt på type (${total} i alt)</h4>
+      <div class="stat-bar">${bar}</div>
+      <div class="stat-legend">${legend}</div>
+    </div>`;
+}
+
 async function renderBadges(){
   const el = document.getElementById('badges-widget');
   if(!el) return;
@@ -2260,12 +2489,33 @@ async function renderBadges(){
   el.innerHTML = `<div class="badges-strip">${chips}</div>${beeCount ? `<div class="today-mono" style="margin-top:8px;opacity:0.6;font-size:11px;">🐝 ${beeCount} bivenlig${beeCount===1?'':'e'} plante${beeCount===1?'':'r'} i din have</div>` : ''}`;
 }
 
+let journalTypeFilter = 'alle';
+
+function renderJournalTypeFilters(){
+  const el = document.getElementById('journal-type-filters');
+  if(!el) return;
+  const filters = ['alle','blomst','busk','træ','plæne'];
+  const labels = {alle:'Alle', blomst:'🌸', busk:'🌿', 'træ':'🌳', 'plæne':'🟩'};
+  el.innerHTML = filters.map(f=>`<button class="${f===journalTypeFilter?'active':''}" onclick="setJournalTypeFilter('${f}')" title="${TYPE_LABEL[f]||'Alle'}">${labels[f]}</button>`).join('');
+}
+function setJournalTypeFilter(f){
+  journalTypeFilter = f;
+  renderJournalTypeFilters();
+  renderJournal();
+}
+
 function renderJournal(){
+  renderJournalTypeFilters();
   const q = (document.getElementById('journal-search')?.value || '').toLowerCase();
+  const bloomOnly = document.getElementById('journal-bloom-only')?.checked;
   const list = document.getElementById('journal-list');
-  const items = gardenData.plants.filter(p => p.name.toLowerCase().includes(q));
+  const items = gardenData.plants.filter(p =>
+    p.name.toLowerCase().includes(q) &&
+    (journalTypeFilter==='alle' || p.type===journalTypeFilter) &&
+    (!bloomOnly || bloomMatchesCurrentMonth(p.bloom))
+  );
   if(!items.length){
-    list.innerHTML = `<div class="journal-empty">${gardenData.plants.length? 'Ingen planter matcher din søgning.' : 'Du har ikke registreret nogen planter endnu. Find din adresse på kortet, tryk “Tilføj plante”, og klik hvor den står.'}</div>`;
+    list.innerHTML = `<div class="journal-empty">${gardenData.plants.length? 'Ingen planter matcher dine filtre.' : 'Du har ikke registreret nogen planter endnu. Find din adresse på kortet, tryk “Tilføj plante”, og klik hvor den står.'}</div>`;
     return;
   }
   list.innerHTML = items.map(p=>`
@@ -2791,6 +3041,12 @@ function savePlant(){
     lng = pendingLatLng ? pendingLatLng.lng : gardenData.center?.lng;
   }
 
+  const warnings = findCompanionWarnings(name, lat, lng, editingPlantId);
+  if(warnings.length){
+    const proceed = confirm(`⚠️ Værd at vide:\n\n${warnings.join('\n')}\n\nVil du stadig gemme den her?`);
+    if(!proceed) return;
+  }
+
   const plant = {
     id: editingPlantId || ('p'+Date.now()+Math.random().toString(36).slice(2,7)),
     lat, lng, polygon,
@@ -2816,10 +3072,32 @@ function savePlant(){
   renderMarkers();
   renderJournal();
   buildYearWheel();
+  renderTypeChart();
   pendingLatLng = null;
   pendingPolygon = null;
   closeModal('add-modal');
   toast(polygon ? 'Bed gemt ▱' : 'Plante gemt 🌱');
+}
+
+// ---------- CSV export ----------
+function exportGardenCsv(){
+  const headers = ['Navn','Type','Højde','Blomstrer','Bivenlig','Lat','Lng','Noter'];
+  const csvEscape = v => `"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const rows = gardenData.plants.map(p => [
+    p.name, TYPE_LABEL[p.type]||p.type, p.height||'', p.bloom||'',
+    p.bee ? 'Ja' : 'Nej', p.lat!=null?p.lat.toFixed(6):'', p.lng!=null?p.lng.toFixed(6):'', p.notes||''
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8' }); // BOM so Excel reads æøå correctly
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'havehjulet-planter.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV downloadet');
 }
 
 // ---------- PDF export ----------
@@ -3166,12 +3444,12 @@ function openDetail(id){
       ${tasksHtml}
     </div>
     ${p.notes ? `<div class="detail-note-box"><b>Dine noter:</b><br>${escapeHtml(p.notes)}</div>` : ''}
-    <div class="modal-actions">
+    ${viewOnlyMode ? '' : `<div class="modal-actions">
       <button class="secondary-btn delete-plant-btn" onclick="deletePlant('${p.id}')">Slet plante</button>
       <button class="secondary-btn" onclick="openQrModal('${p.id}')">🔖 QR-mærke</button>
       ${p.polygon ? `<button class="secondary-btn" onclick="startShapeEdit('${p.id}')">✎ Ret form</button>` : ''}
       <button class="primary-btn" onclick="editPlant('${p.id}')">Redigér</button>
-    </div>
+    </div>`}
   `;
   document.getElementById('detail-modal').classList.add('show');
 }
@@ -3205,13 +3483,132 @@ function editPlant(id){
 }
 
 function deletePlant(id){
-  gardenData.plants = gardenData.plants.filter(p=>p.id!==id);
+  const idx = gardenData.plants.findIndex(p=>p.id===id);
+  if(idx===-1) return;
+  const [removed] = gardenData.plants.splice(idx, 1);
+  removed.deletedAt = Date.now();
+  if(!gardenData.trash) gardenData.trash = [];
+  gardenData.trash.push(removed);
   saveGarden();
   renderMarkers();
   renderJournal();
   buildYearWheel();
+  renderTypeChart();
+  updateTrashButton();
   closeModal('detail-modal');
-  toast('Plante slettet');
+  showUndoToast(`“${removed.name}” flyttet til papirkurven`, id);
+}
+
+function restorePlantCore(id){
+  const idx = (gardenData.trash||[]).findIndex(p=>p.id===id);
+  if(idx===-1) return false;
+  const [restored] = gardenData.trash.splice(idx, 1);
+  delete restored.deletedAt;
+  gardenData.plants.push(restored);
+  saveGarden();
+  renderMarkers();
+  renderJournal();
+  buildYearWheel();
+  renderTypeChart();
+  updateTrashButton();
+  return true;
+}
+
+let pendingUndoId = null;
+function showUndoToast(text, plantId){
+  pendingUndoId = plantId;
+  const el = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-text').textContent = text;
+  el.classList.add('show');
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=>{ el.classList.remove('show'); pendingUndoId = null; }, 6000);
+}
+function handleUndoClick(){
+  const el = document.getElementById('undo-toast');
+  el.classList.remove('show');
+  clearTimeout(el._hideTimer);
+  if(pendingUndoId && restorePlantCore(pendingUndoId)){
+    toast('Fortrudt — planten er tilbage 🌱');
+  }
+  pendingUndoId = null;
+}
+
+
+function printMap(){
+  document.body.classList.add('print-map-mode');
+  const cleanup = ()=>{ document.body.classList.remove('print-map-mode'); window.onafterprint = null; };
+  window.onafterprint = cleanup;
+  setTimeout(()=>{ window.print(); setTimeout(cleanup, 1000); }, 150);
+}
+
+// ---------- Dark mode ----------
+function applyThemeIcon(){
+  const btn = document.getElementById('theme-toggle-btn');
+  if(!btn) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  btn.textContent = isDark ? '☀️' : '🌙';
+}
+function toggleDarkMode(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if(isDark){
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('havehjulet_theme', 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('havehjulet_theme', 'dark');
+  }
+  applyThemeIcon();
+}
+
+// ---------- Trash (30-day soft delete) ----------
+function purgeOldTrash(){
+  if(!gardenData.trash || !gardenData.trash.length) return false;
+  const cutoff = Date.now() - 30*24*60*60*1000;
+  const before = gardenData.trash.length;
+  gardenData.trash = gardenData.trash.filter(p => p.deletedAt && p.deletedAt > cutoff);
+  return gardenData.trash.length !== before;
+}
+
+function updateTrashButton(){
+  const btn = document.getElementById('trash-btn');
+  if(!btn) return;
+  const n = (gardenData.trash||[]).length;
+  btn.textContent = `🗑 Papirkurv${n ? ' ('+n+')' : ''}`;
+}
+
+function openTrashModal(){
+  const body = document.getElementById('trash-body');
+  const items = gardenData.trash || [];
+  if(!items.length){
+    body.innerHTML = `<div class="empty-note">Papirkurven er tom.</div>`;
+  } else {
+    body.innerHTML = items.slice().sort((a,b)=>b.deletedAt-a.deletedAt).map(p=>{
+      const daysLeft = Math.max(0, 30 - Math.floor((Date.now()-p.deletedAt)/(24*60*60*1000)));
+      return `<div class="journal-item" style="cursor:default;">
+          <div class="ico" style="background:${TYPE_COLOR[p.type]}22;">${p.icon||'🌱'}</div>
+          <div class="info" style="flex:1;"><b>${escapeHtml(p.name)}</b><span>${TYPE_LABEL[p.type]||''} · slettes om ${daysLeft} dage</span></div>
+          <button class="secondary-btn" style="padding:6px 10px;font-size:11.5px;" onclick="restorePlant('${p.id}')">↩ Gendan</button>
+          <button class="del-addr" style="opacity:0.7;" onclick="permanentlyDeletePlant('${p.id}')" title="Slet permanent">✕</button>
+        </div>`;
+    }).join('');
+  }
+  document.getElementById('trash-modal').classList.add('show');
+}
+
+function restorePlant(id){
+  if(restorePlantCore(id)){
+    openTrashModal();
+    toast('Plante gendannet 🌱');
+  }
+}
+
+function permanentlyDeletePlant(id){
+  if(!confirm('Slet permanent? Dette kan ikke fortrydes.')) return;
+  gardenData.trash = (gardenData.trash||[]).filter(p=>p.id!==id);
+  saveGarden();
+  updateTrashButton();
+  openTrashModal();
+  toast('Slettet permanent');
 }
 
 // ---------- utils ----------

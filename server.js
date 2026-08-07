@@ -237,6 +237,42 @@ app.post('/api/garden/leave', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Read-only share links (no login required to view) ----------
+app.get('/api/garden/share', authMiddleware, (req, res) => {
+  const db = readDb();
+  let token = Object.keys(db.shareLinks).find(t => db.shareLinks[t].gardenId === req.gardenId);
+  if(!token){
+    token = crypto.randomBytes(8).toString('hex');
+    db.shareLinks[token] = { gardenId: req.gardenId, createdAt: Date.now() };
+    writeDb(db);
+  }
+  res.json({ token, viewUrl: PUBLIC_URL ? `${PUBLIC_URL}/?view=${token}` : null });
+});
+
+app.post('/api/garden/share/revoke', authMiddleware, (req, res) => {
+  const db = readDb();
+  const token = Object.keys(db.shareLinks).find(t => db.shareLinks[t].gardenId === req.gardenId);
+  if(token){ delete db.shareLinks[token]; writeDb(db); }
+  res.json({ ok: true });
+});
+
+// Public, unauthenticated: read-only garden data for a share link.
+app.get('/api/public/garden/:token', (req, res) => {
+  const db = readDb();
+  const link = db.shareLinks[req.params.token];
+  if(!link) return res.status(404).json({ error: 'Linket findes ikke eller er blevet inaktiveret' });
+  const garden = db.gardens[link.gardenId] || emptyGarden();
+  // Strip anything not needed for a read-only view (no member usernames, no pests).
+  res.json({
+    garden: {
+      center: garden.center,
+      zoom: garden.zoom,
+      plants: garden.plants || [],
+      addresses: garden.addresses || []
+    }
+  });
+});
+
 // ---------- Garden data ----------
 app.get('/api/garden', authMiddleware, (req, res) => {
   const db = readDb();
