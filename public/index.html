@@ -141,6 +141,11 @@
     background:var(--surface);font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s;
   }
   .field input:focus{border-color:var(--fern);}
+  .field select{
+    width:100%;padding:12px 14px;border-radius:9px;border:1.5px solid var(--line);
+    background:var(--surface);font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s;
+  }
+  .field select:focus{border-color:var(--fern);}
   .primary-btn{
     background:var(--moss);color:var(--parchment);border:none;border-radius:9px;
     padding:13px 20px;font-size:14.5px;font-weight:600;width:100%;margin-top:6px;
@@ -241,6 +246,12 @@
   .view-only-banner{
     background:var(--gold);color:var(--ink);text-align:center;padding:7px;font-size:12.5px;font-weight:700;
   }
+  .bell-badge{
+    position:absolute;top:2px;right:2px;background:var(--clay);color:#fff;border-radius:999px;
+    font-size:9.5px;font-weight:800;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;padding:0 3px;
+  }
+  .search-result-group{margin-bottom:14px;}
+  .search-result-group h5{font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--soil);opacity:0.65;margin:0 0 6px;}
   .suggest-section{margin-top:18px;}
   .suggest-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
   .suggest-head h4{margin:0;font-size:14px;color:var(--moss);}
@@ -621,6 +632,8 @@
       <button id="tab-map" onclick="switchView('map')">Havekort</button>
     </nav>
     <div class="topbar-right">
+      <button class="logout-btn" id="search-btn" onclick="openSearchModal()" title="Søg">🔍</button>
+      <button class="logout-btn" id="bell-btn" onclick="openBellModal()" title="Opgaver denne måned" style="position:relative;">🔔<span id="bell-badge" class="bell-badge" style="display:none;"></span></button>
       <span class="user-pill" id="user-pill"></span>
       <button class="logout-btn" id="admin-btn" onclick="openAdminModal()" title="Admin" style="display:none;">🛠</button>
       <button class="logout-btn" id="theme-toggle-btn" onclick="toggleDarkMode()" title="Mørkt/lyst tema">🌙</button>
@@ -670,6 +683,11 @@
             <h3>Mine adresser</h3>
           </div>
           <div class="journal-list" id="address-list" style="flex:0 0 auto;max-height:180px;border-bottom:1px solid var(--line);padding-bottom:6px;"></div>
+          <div class="journal-head" style="padding-bottom:8px;">
+            <select id="garden-group-filter" onchange="setGardenGroupFilter(this.value)">
+              <option value="">🏡 Alle haver</option>
+            </select>
+          </div>
           <div class="journal-head">
             <h3>Mine planter</h3>
             <input class="journal-search" id="journal-search" placeholder="Søg blandt dine planter…" oninput="renderJournal()">
@@ -683,6 +701,8 @@
             <div class="today-mono" style="opacity:0.6;font-size:11px;margin-bottom:10px;">Klik “Tilføj plante” og peg på kortet</div>
             <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="exportGardenPdf()">📄 Eksportér haveplan som PDF</button>
             <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="exportGardenCsv()">📊 Eksportér som CSV</button>
+            <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('csv-import-input').click()">📥 Importér fra CSV</button>
+            <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none;" onchange="importGardenCsv(event)">
             <button class="secondary-btn" id="trash-btn" style="width:100%;" onclick="openTrashModal()">🗑 Papirkurv</button>
           </div>
         </div>
@@ -798,6 +818,13 @@
       </div>
 
       <div class="field">
+        <label>Hvilken have hører den til? (valgfrit)</label>
+        <select id="plant-address-group">
+          <option value="">Ingen bestemt / hele haven</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label>Noter</label>
         <textarea class="notes" id="plant-notes" placeholder="Egne noter om denne plante…"></textarea>
       </div>
@@ -845,6 +872,33 @@
       <button class="modal-close" onclick="closeModal('admin-modal')">✕</button>
     </div>
     <div class="modal-body" id="admin-body">Indlæser…</div>
+  </div>
+</div>
+
+<!-- ===== BELL MODAL ===== -->
+<div class="modal-overlay" id="bell-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>🔔 Opgaver denne måned</h3>
+      <button class="modal-close" onclick="closeModal('bell-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="bell-body"></div>
+  </div>
+</div>
+
+<!-- ===== SEARCH MODAL ===== -->
+<div class="modal-overlay" id="search-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>🔍 Søg i din have</h3>
+      <button class="modal-close" onclick="closeModal('search-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <input type="text" id="global-search-input" placeholder="Søg planter, adresser, skadedyr…" oninput="renderGlobalSearch()" autocomplete="off">
+      </div>
+      <div id="global-search-results"></div>
+    </div>
   </div>
 </div>
 
@@ -1256,7 +1310,8 @@ function toast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._h);
-  t._h = setTimeout(()=>t.classList.remove('show'), 2400);
+  const duration = msg.length > 60 ? 5500 : 2400;
+  t._h = setTimeout(()=>t.classList.remove('show'), duration);
 }
 
 // ---------- API helper ----------
@@ -1389,11 +1444,13 @@ function enterApp(){
   initMapIfNeeded();
   renderJournal();
   renderAddressList();
+  populateAddressSelects();
   loadWeather();
   renderBadges();
   renderTypeChart();
   renderPlantingSuggestions();
   updateTrashButton();
+  updateBellBadge();
   tryOpenDeepLinkedPlant();
 }
 
@@ -1531,7 +1588,7 @@ async function importGardenJson(e){
     if(!gardenData.addresses) gardenData.addresses = [];
     await saveGarden();
     renderMarkers(); renderAddressMarkers(); renderPestMarkers();
-    renderJournal(); renderAddressList(); buildYearWheel(); loadWeather(); renderBadges(); renderTypeChart();
+    renderJournal(); renderAddressList(); buildYearWheel(); loadWeather(); renderBadges(); renderTypeChart(); updateBellBadge();
     closeModal('settings-modal');
     toast('Havedata importeret');
   }catch(err){
@@ -2308,6 +2365,7 @@ function renderMarkers(){
   if(!markerLayer) return;
   markerLayer.clearLayers();
   gardenData.plants.forEach(p=>{
+    if(gardenGroupFilter && p.addressGroup !== gardenGroupFilter) return;
     const tipHtml = `<div class="tip-inner">
         <div class="tip-img">${p.image ? `<img src="${escapeAttr(p.image)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">` : (p.icon||'🌱')}</div>
         <b>${escapeHtml(p.name)}</b>
@@ -2357,6 +2415,32 @@ const COMPANION_CONFLICTS = [
   { pair: ['Birk','Rhododendron'], note: 'Birk har tætte, grådige rødder tæt under overfladen, som konkurrerer hårdt om vand og næring.' }
 ];
 const COMPANION_RADIUS_M = 5;
+
+const COMPANION_GOOD = [
+  { pair: ['Lavendel','Rose'], note: 'Lavendel kan holde bladlus væk fra roser, og de trives i samme sol og jord.' },
+  { pair: ['Storkenæb','Rose'], note: 'Storkenæb dækker jorden om rosers "bare stængler" og holder på fugten.' },
+  { pair: ['Løvefod','Rose'], note: 'Klassisk havekombination — løvefods bløde form komplementerer rosens struktur.' },
+  { pair: ['Nellike','Lavendel'], note: 'Begge kan lide sol og veldrænet jord, og blomstrer flot sammen.' },
+  { pair: ['Hyld','Solhat'], note: 'Tiltrækker tilsammen både bestøvere og nytteinsekter.' },
+  { pair: ['Kornel','Hortensia'], note: 'Kornellens vinterfarve og hortensiaens sommerblomstring giver interesse hele året.' },
+  { pair: ['Klematis','Rose'], note: 'Klassisk kombination — klematis kan klatre gennem en klatrerose for dobbelt blomstring.' }
+];
+
+function findCompanionGoodMatches(name, lat, lng, excludeId){
+  if(lat==null || lng==null) return [];
+  const matches = [];
+  gardenData.plants.forEach(other=>{
+    if(other.id === excludeId) return;
+    if(haversineMeters(lat, lng, other.lat, other.lng) > COMPANION_RADIUS_M) return;
+    COMPANION_GOOD.forEach(c=>{
+      const [a,b] = c.pair;
+      if((name===a && other.name===b) || (name===b && other.name===a)){
+        matches.push({ note: c.note, otherName: other.name });
+      }
+    });
+  });
+  return matches;
+}
 
 function haversineMeters(lat1, lng1, lat2, lng2){
   const R = 6371000;
@@ -2512,7 +2596,8 @@ function renderJournal(){
   const items = gardenData.plants.filter(p =>
     p.name.toLowerCase().includes(q) &&
     (journalTypeFilter==='alle' || p.type===journalTypeFilter) &&
-    (!bloomOnly || bloomMatchesCurrentMonth(p.bloom))
+    (!bloomOnly || bloomMatchesCurrentMonth(p.bloom)) &&
+    (!gardenGroupFilter || p.addressGroup===gardenGroupFilter)
   );
   if(!items.length){
     list.innerHTML = `<div class="journal-empty">${gardenData.plants.length? 'Ingen planter matcher dine filtre.' : 'Du har ikke registreret nogen planter endnu. Find din adresse på kortet, tryk “Tilføj plante”, og klik hvor den står.'}</div>`;
@@ -2541,6 +2626,34 @@ function flyToPlant(id){
 }
 
 // ---------- Addresses ----------
+// ---------- Multiple gardens (grouped by saved address) ----------
+let gardenGroupFilter = '';
+
+function populateAddressSelects(){
+  const addresses = gardenData.addresses || [];
+  const plantSel = document.getElementById('plant-address-group');
+  if(plantSel){
+    const current = plantSel.value;
+    plantSel.innerHTML = '<option value="">Ingen bestemt / hele haven</option>' +
+      addresses.map(a=>`<option value="${escapeAttr(a.id)}">${escapeHtml(a.name)}</option>`).join('');
+    plantSel.value = current;
+  }
+  const filterSel = document.getElementById('garden-group-filter');
+  if(filterSel){
+    const current = filterSel.value;
+    filterSel.innerHTML = '<option value="">🏡 Alle haver</option>' +
+      addresses.map(a=>`<option value="${escapeAttr(a.id)}">${escapeHtml(a.name)}</option>`).join('');
+    filterSel.value = addresses.some(a=>a.id===current) ? current : '';
+    gardenGroupFilter = filterSel.value;
+  }
+}
+
+function setGardenGroupFilter(id){
+  gardenGroupFilter = id;
+  renderMarkers();
+  renderJournal();
+}
+
 function renderAddressList(){
   const list = document.getElementById('address-list');
   if(!list) return;
@@ -2598,6 +2711,7 @@ function saveAddress(){
   saveGarden();
   renderAddressList();
   renderAddressMarkers();
+  populateAddressSelects();
   if(gardenData.addresses.length===1) loadWeather();
   closeModal('address-modal');
   toast('Adresse gemt 📍');
@@ -2617,6 +2731,7 @@ function deleteAddress(id){
   saveGarden();
   renderAddressList();
   renderAddressMarkers();
+  populateAddressSelects();
   loadWeather();
   toast('Adresse slettet');
 }
@@ -2665,6 +2780,8 @@ function openAddModal(){
   document.getElementById('plant-bloom').value='';
   document.getElementById('plant-image').value='';
   document.getElementById('plant-notes').value='';
+  populateAddressSelects();
+  document.getElementById('plant-address-group').value = '';
   buildTaskMonthGrid();
   document.getElementById('add-modal').classList.add('show');
   if(pendingSuggestionName){
@@ -3060,6 +3177,7 @@ function savePlant(){
     desc: pickedDb ? pickedDb.desc : '',
     tasks: collectTasksFromFields(),
     bee: BEE_FRIENDLY_NAMES.has(name),
+    addressGroup: document.getElementById('plant-address-group').value || null,
     photos: existing ? (existing.photos || []) : []
   };
   if(editingPlantId){
@@ -3073,10 +3191,16 @@ function savePlant(){
   renderJournal();
   buildYearWheel();
   renderTypeChart();
+  updateBellBadge();
   pendingLatLng = null;
   pendingPolygon = null;
   closeModal('add-modal');
-  toast(polygon ? 'Bed gemt ▱' : 'Plante gemt 🌱');
+  const goodMatches = findCompanionGoodMatches(name, lat, lng, editingPlantId);
+  if(goodMatches.length){
+    toast(`💡 ${name} og ${goodMatches[0].otherName} passer godt sammen — ${goodMatches[0].note}`);
+  } else {
+    toast(polygon ? 'Bed gemt ▱' : 'Plante gemt 🌱');
+  }
 }
 
 // ---------- CSV export ----------
@@ -3098,6 +3222,77 @@ function exportGardenCsv(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('CSV downloadet');
+}
+
+// ---------- CSV import ----------
+const REVERSE_TYPE_LABEL = { 'Blomst':'blomst', 'Busk':'busk', 'Træ':'træ', 'Plæne':'plæne' };
+
+function parseCsvLine(line){
+  const result = [];
+  let cur = '', inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const c = line[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(line[i+1] === '"'){ cur+='"'; i++; }
+        else inQuotes = false;
+      } else cur += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ result.push(cur); cur=''; }
+      else cur += c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+async function importGardenCsv(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  try{
+    let text = await file.text();
+    text = text.replace(/^\uFEFF/, ''); // strip BOM if present
+    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length);
+    if(lines.length < 2){ toast('Filen indeholder ingen rækker at importere'); return; }
+
+    const rows = lines.slice(1).map(parseCsvLine).filter(r => r[0] && r[0].trim());
+    if(!rows.length){ toast('Ingen gyldige rækker fundet'); return; }
+
+    if(!confirm(`Importér ${rows.length} planter fra CSV-filen? De tilføjes til din nuværende have (erstatter ikke noget).`)) return;
+
+    rows.forEach(r=>{
+      const [name, typeLabel, height, bloom, beeStr, latStr, lngStr, notes] = r;
+      const lat = parseFloat(latStr);
+      const lng = parseFloat(lngStr);
+      gardenData.plants.push({
+        id: 'p'+Date.now()+Math.random().toString(36).slice(2,7),
+        lat: isFinite(lat) ? lat : gardenData.center?.lat,
+        lng: isFinite(lng) ? lng : gardenData.center?.lng,
+        polygon: null,
+        type: REVERSE_TYPE_LABEL[typeLabel] || 'blomst',
+        name: name.trim(),
+        height: (height||'').trim(),
+        bloom: (bloom||'').trim(),
+        image: '',
+        notes: (notes||'').trim(),
+        icon: '🌱',
+        desc: '',
+        tasks: {},
+        bee: (beeStr||'').trim().toLowerCase() === 'ja',
+        photos: []
+      });
+    });
+
+    await saveGarden();
+    renderMarkers(); renderAddressMarkers(); renderJournal();
+    buildYearWheel(); renderBadges(); renderTypeChart(); updateBellBadge();
+    closeModal('settings-modal');
+    toast(`${rows.length} planter importeret 🌱`);
+  }catch(err){
+    toast('Kunne ikke læse CSV-filen');
+  }
 }
 
 // ---------- PDF export ----------
@@ -3413,6 +3608,31 @@ function wateringTip(p){
   return `<div class="detail-note-box" style="border:1px solid #d9a44155;background:#d9a44115;">💧 <b>Vandingsråd:</b> ${tip}</div>`;
 }
 
+function daysSince(iso){
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (24*60*60*1000));
+}
+
+function renderWaterLogSection(p){
+  const log = p.waterLog || [];
+  const last = log.length ? log[log.length-1] : null;
+  const status = last ? `Sidst vandet: ${daysSince(last)===0 ? 'i dag' : daysSince(last)+' dage siden'}` : 'Ikke registreret endnu';
+  return `<div class="detail-note-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <span>💧 ${status}</span>
+      <button class="secondary-btn" style="padding:6px 12px;font-size:11.5px;flex:0 0 auto;" onclick="logWatering('${p.id}')">Vandet i dag</button>
+    </div>`;
+}
+
+function logWatering(plantId){
+  const p = gardenData.plants.find(x=>x.id===plantId);
+  if(!p) return;
+  const today = new Date().toISOString().slice(0,10);
+  if(!p.waterLog) p.waterLog = [];
+  if(p.waterLog[p.waterLog.length-1] !== today) p.waterLog.push(today);
+  saveGarden();
+  openDetail(plantId);
+  toast('Registreret 💧');
+}
+
 function openDetail(id){
   const p = gardenData.plants.find(x=>x.id===id);
   if(!p) return;
@@ -3438,6 +3658,7 @@ function openDetail(id){
     </div>
     ${p.desc ? `<div class="detail-desc">${escapeHtml(p.desc)}</div>` : ''}
     ${wateringTip(p)}
+    ${renderWaterLogSection(p)}
     ${renderPhotoGallery(p)}
     <div class="detail-tasks">
       <h5>Pasning måned for måned</h5>
@@ -3477,6 +3698,8 @@ function editPlant(id){
   document.getElementById('plant-bloom').value = p.bloom||'';
   document.getElementById('plant-image').value = p.image||'';
   document.getElementById('plant-notes').value = p.notes||'';
+  populateAddressSelects();
+  document.getElementById('plant-address-group').value = p.addressGroup || '';
   buildTaskMonthGrid();
   populateTaskFields(p.tasks || {});
   document.getElementById('add-modal').classList.add('show');
@@ -3494,6 +3717,7 @@ function deletePlant(id){
   renderJournal();
   buildYearWheel();
   renderTypeChart();
+  updateBellBadge();
   updateTrashButton();
   closeModal('detail-modal');
   showUndoToast(`“${removed.name}” flyttet til papirkurven`, id);
@@ -3510,6 +3734,7 @@ function restorePlantCore(id){
   renderJournal();
   buildYearWheel();
   renderTypeChart();
+  updateBellBadge();
   updateTrashButton();
   return true;
 }
@@ -3567,6 +3792,82 @@ function purgeOldTrash(){
   const before = gardenData.trash.length;
   gardenData.trash = gardenData.trash.filter(p => p.deletedAt && p.deletedAt > cutoff);
   return gardenData.trash.length !== before;
+}
+
+// ---------- Notification bell ----------
+function currentMonthTaskList(){
+  const month = currentMonthIndex();
+  const plantTasks = gardenData.plants.filter(p => p.tasks && p.tasks[month]);
+  return { month, plantTasks };
+}
+
+function updateBellBadge(){
+  const badge = document.getElementById('bell-badge');
+  if(!badge) return;
+  const { plantTasks } = currentMonthTaskList();
+  const n = plantTasks.length;
+  if(n){ badge.textContent = n; badge.style.display = 'flex'; }
+  else { badge.style.display = 'none'; }
+}
+
+function openBellModal(){
+  const { month, plantTasks } = currentMonthTaskList();
+  const body = document.getElementById('bell-body');
+  let html = `<div class="today-mono" style="margin-bottom:14px;opacity:0.7;">${MONTHS_FULL[month].charAt(0).toUpperCase()+MONTHS_FULL[month].slice(1)}</div>`;
+  if(plantTasks.length){
+    html += plantTasks.map(p=>`<div class="task-item"><div class="icon">${p.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(p.name)}</b> — ${escapeHtml(p.tasks[month])}</div></div>`).join('');
+  } else {
+    html += `<div class="empty-note">Ingen af dine planter har specifikke opgaver denne måned.</div>`;
+  }
+  html += `<div class="task-item" style="margin-top:10px;"><div class="icon">🪴</div><div class="txt">${escapeHtml(GENERIC_TASKS[month])}</div></div>`;
+  body.innerHTML = html;
+  document.getElementById('bell-modal').classList.add('show');
+}
+
+// ---------- Global search ----------
+function openSearchModal(){
+  document.getElementById('global-search-input').value = '';
+  document.getElementById('global-search-results').innerHTML = '';
+  document.getElementById('search-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('global-search-input').focus(), 100);
+}
+
+function renderGlobalSearch(){
+  const q = document.getElementById('global-search-input').value.trim().toLowerCase();
+  const el = document.getElementById('global-search-results');
+  if(!q){ el.innerHTML = ''; return; }
+
+  const plants = gardenData.plants.filter(p=>p.name.toLowerCase().includes(q));
+  const addresses = (gardenData.addresses||[]).filter(a=>a.name.toLowerCase().includes(q));
+  const pests = (gardenData.pests||[]).filter(ps=>ps.name.toLowerCase().includes(q));
+
+  if(!plants.length && !addresses.length && !pests.length){
+    el.innerHTML = `<div class="empty-note">Ingen resultater for "${escapeHtml(q)}".</div>`;
+    return;
+  }
+
+  let html = '';
+  if(plants.length){
+    html += `<div class="search-result-group"><h5>Planter</h5>${plants.map(p=>`
+      <div class="journal-item" onclick="closeModal('search-modal');flyToPlant('${p.id}')">
+        <div class="ico" style="background:${TYPE_COLOR[p.type]}22;">${p.icon||'🌱'}</div>
+        <div class="info"><b>${escapeHtml(p.name)}</b><span>${TYPE_LABEL[p.type]||''}</span></div>
+      </div>`).join('')}</div>`;
+  }
+  if(addresses.length){
+    html += `<div class="search-result-group"><h5>Adresser</h5>${addresses.map(a=>`
+      <div class="address-item" onclick="closeModal('search-modal');flyToAddress('${a.id}')">
+        <div class="ico">📍</div><b>${escapeHtml(a.name)}</b>
+      </div>`).join('')}</div>`;
+  }
+  if(pests.length){
+    html += `<div class="search-result-group"><h5>Skadedyr/sygdom</h5>${pests.map(ps=>`
+      <div class="journal-item" onclick="closeModal('search-modal');switchView('map');setTimeout(()=>{map.setView([${ps.lat},${ps.lng}],20);openPestDetail('${ps.id}');},150);">
+        <div class="ico" style="background:#a8322322;">${ps.icon}</div>
+        <div class="info"><b>${escapeHtml(ps.name)}</b><span>${escapeHtml(ps.date)}</span></div>
+      </div>`).join('')}</div>`;
+  }
+  el.innerHTML = html;
 }
 
 function updateTrashButton(){
