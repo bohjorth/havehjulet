@@ -27,6 +27,19 @@ async function fetchWithTimeout(url, options = {}, ms = 9000){
     clearTimeout(timer);
   }
 }
+
+// External APIs sometimes respond with plain text instead of JSON (e.g. a
+// paywall message like "Please Upgrade your plan..."). Parsing that with
+// r.json() throws and used to crash the request — this reads the body as
+// text first and only parses it as JSON if it actually looks like JSON.
+async function readJsonOrText(r){
+  const text = await r.text();
+  try{
+    return { json: JSON.parse(text), raw: null };
+  }catch(e){
+    return { json: null, raw: text.slice(0, 200) };
+  }
+}
 const PERENUAL_API_KEY = process.env.PERENUAL_API_KEY || '';
 const TREFLE_API_KEY = process.env.TREFLE_API_KEY || '';
 const PLANTNET_API_KEY = process.env.PLANTNET_API_KEY || '';
@@ -416,13 +429,17 @@ app.get('/api/geocode', authMiddleware, async (req, res) => {
   if(!q) return res.json([]);
   try{
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, {
+    const r = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'Havehjulet/1.0 (self-hosted garden app)' }
     });
-    const data = await r.json();
-    res.json(data);
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Nominatim — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: `Adressetjenesten svarede uventet: ${raw}` });
+    }
+    res.status(r.ok ? 200 : r.status).json(json);
   }catch(e){
-    res.status(502).json({ error: 'Kunne ikke kontakte adressetjenesten' });
+    res.status(502).json({ error: e.name==='AbortError' ? 'Adressetjenesten svarede ikke i tide (timeout)' : 'Kunne ikke kontakte adressetjenesten' });
   }
 });
 
@@ -434,8 +451,12 @@ app.get('/api/plants/search', authMiddleware, async (req, res) => {
   try{
     const url = `https://perenual.com/api/species-list?key=${encodeURIComponent(PERENUAL_API_KEY)}&q=${encodeURIComponent(q)}`;
     const r = await fetchWithTimeout(url);
-    const data = await r.json();
-    res.json(data);
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Perenual search — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: raw.toLowerCase().includes('upgrad') ? 'Perenual: denne funktion kræver et betalt abonnement' : `Perenual svarede uventet: ${raw}` });
+    }
+    res.status(r.ok ? 200 : r.status).json(json);
   }catch(e){
     res.status(502).json({ error: e.name==='AbortError' ? 'Perenual svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Perenual' });
   }
@@ -447,12 +468,16 @@ app.get('/api/plants/details/:id', authMiddleware, async (req, res) => {
   try{
     const url = `https://perenual.com/api/species/details/${id}?key=${encodeURIComponent(PERENUAL_API_KEY)}`;
     const r = await fetchWithTimeout(url);
-    const data = await r.json();
-    if(!r.ok){
-      console.error('Perenual details fejl:', r.status, JSON.stringify(data));
-      return res.status(r.status).json({ error: data.message || data.error || `Perenual svarede med status ${r.status}` });
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Perenual details — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: raw.toLowerCase().includes('upgrad') ? 'Perenual: detaljeret pasningsinfo kræver et betalt abonnement — søgningen er stadig gratis' : `Perenual svarede uventet: ${raw}` });
     }
-    res.json(data);
+    if(!r.ok){
+      console.error('Perenual details fejl:', r.status, JSON.stringify(json));
+      return res.status(r.status).json({ error: json.message || json.error || `Perenual svarede med status ${r.status}` });
+    }
+    res.json(json);
   }catch(e){
     console.error('Perenual details exception:', e.message);
     res.status(502).json({ error: e.name==='AbortError' ? 'Perenual svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Perenual' });
@@ -467,8 +492,12 @@ app.get('/api/trefle/search', authMiddleware, async (req, res) => {
   try{
     const url = `https://trefle.io/api/v1/plants/search?token=${encodeURIComponent(TREFLE_API_KEY)}&q=${encodeURIComponent(q)}`;
     const r = await fetchWithTimeout(url);
-    const data = await r.json();
-    res.json(data);
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Trefle search — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: `Trefle svarede uventet: ${raw}` });
+    }
+    res.status(r.ok ? 200 : r.status).json(json);
   }catch(e){
     res.status(502).json({ error: e.name==='AbortError' ? 'Trefle svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Trefle' });
   }
@@ -480,8 +509,12 @@ app.get('/api/trefle/details/:id', authMiddleware, async (req, res) => {
   try{
     const url = `https://trefle.io/api/v1/plants/${id}?token=${encodeURIComponent(TREFLE_API_KEY)}`;
     const r = await fetchWithTimeout(url);
-    const data = await r.json();
-    res.json(data);
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Trefle details — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: `Trefle svarede uventet: ${raw}` });
+    }
+    res.status(r.ok ? 200 : r.status).json(json);
   }catch(e){
     res.status(502).json({ error: e.name==='AbortError' ? 'Trefle svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Trefle' });
   }
@@ -498,12 +531,16 @@ app.post('/api/plantnet/identify', authMiddleware, upload.single('image'), async
     form.append('organs', 'auto');
     const url = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(PLANTNET_API_KEY)}&lang=da`;
     const r = await fetchWithTimeout(url, { method: 'POST', body: form }, 20000);
-    const data = await r.json();
-    if(!r.ok){
-      console.error('Pl@ntNet fejl:', r.status, JSON.stringify(data));
-      return res.status(r.status).json({ error: data.message || data.error || `Pl@ntNet svarede med status ${r.status}` });
+    const { json, raw } = await readJsonOrText(r);
+    if(raw !== null){
+      console.error('Pl@ntNet — ikke-JSON svar:', r.status, raw);
+      return res.status(502).json({ error: `Pl@ntNet svarede uventet: ${raw}` });
     }
-    res.json(data);
+    if(!r.ok){
+      console.error('Pl@ntNet fejl:', r.status, JSON.stringify(json));
+      return res.status(r.status).json({ error: json.message || json.error || `Pl@ntNet svarede med status ${r.status}` });
+    }
+    res.json(json);
   }catch(e){
     console.error('Pl@ntNet exception:', e.message);
     res.status(502).json({ error: e.name==='AbortError' ? 'Pl@ntNet svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Pl@ntNet' });
