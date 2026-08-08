@@ -70,6 +70,17 @@
   }
   html[data-theme="dark"] .detail-emoji img,
   html[data-theme="dark"] .qr-code-canvas{ filter:none; }
+  .qr-batch-item{
+    display:inline-block;width:120px;text-align:center;padding:10px;margin:4px;
+    border:1px dashed #ddd0a8;border-radius:8px;background:#fff;vertical-align:top;
+  }
+  .icon-palette{display:flex;gap:6px;flex-wrap:wrap;}
+  .icon-palette button{
+    width:36px;height:36px;font-size:17px;border-radius:8px;border:1.5px solid var(--line);
+    background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .icon-palette button.active{border-color:var(--fern);background:var(--fern);box-shadow:0 0 0 2px var(--fern) inset;}
+  .icon-palette button.reset{font-size:11px;font-weight:700;width:auto;padding:0 10px;color:var(--soil);}
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;}
   body{
@@ -502,6 +513,8 @@
     #qr-print-area{position:fixed;top:20px;left:50%;transform:translateX(-50%);}
     body.print-map-mode #map, body.print-map-mode #map *{visibility:visible;}
     body.print-map-mode #map{position:fixed;top:0;left:0;width:100%;height:100%;}
+    body.print-qrsheet-mode #qr-sheet-print-area, body.print-qrsheet-mode #qr-sheet-print-area *{visibility:visible;}
+    body.print-qrsheet-mode #qr-sheet-print-area{position:absolute !important;top:0 !important;left:0 !important;width:100%;}
   }
 </style>
 </head>
@@ -649,6 +662,7 @@
     </nav>
     <div class="topbar-right">
       <button class="logout-btn" id="search-btn" onclick="openSearchModal()" title="Søg">🔍</button>
+      <button class="logout-btn" onclick="startTour()" title="Rundvisning">❓</button>
       <button class="logout-btn" id="bell-btn" onclick="openBellModal()" title="Opgaver denne måned" style="position:relative;">🔔<span id="bell-badge" class="bell-badge" style="display:none;"></span></button>
       <span class="user-pill" id="user-pill"></span>
       <button class="logout-btn" id="admin-btn" onclick="openAdminModal()" title="Admin" style="display:none;">🛠</button>
@@ -727,6 +741,9 @@
             <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none;" onchange="importGardenCsv(event)">
             <button class="secondary-btn" id="trash-btn" style="width:100%;" onclick="openTrashModal()">🗑 Papirkurv</button>
             <button class="secondary-btn" style="width:100%;margin-top:8px;" onclick="openActivityModal()">🕘 Aktivitet</button>
+            <button class="secondary-btn" style="width:100%;margin-top:8px;" onclick="openJournalModal()">📔 Havedagbog</button>
+            <button class="secondary-btn" style="width:100%;margin-top:8px;" onclick="openWishlistModal()">🌟 Ønskeliste</button>
+            <button class="secondary-btn" style="width:100%;margin-top:8px;" onclick="printAllQrLabels()">🖨️ Print alle QR-mærker</button>
           </div>
         </div>
         <div class="map-col">
@@ -848,6 +865,11 @@
       </div>
 
       <div class="field">
+        <label>Ikon på kortet (valgfrit — sættes automatisk efter type ellers)</label>
+        <div class="icon-palette" id="icon-palette"></div>
+      </div>
+
+      <div class="field">
         <label>Hvilken have hører den til? (valgfrit)</label>
         <select id="plant-address-group">
           <option value="">Ingen bestemt / hele haven</option>
@@ -913,6 +935,67 @@
       <button class="modal-close" onclick="closeModal('admin-modal')">✕</button>
     </div>
     <div class="modal-body" id="admin-body">Indlæser…</div>
+  </div>
+</div>
+
+<!-- ===== JOURNAL (DIARY) MODAL ===== -->
+<div class="modal-overlay" id="journal-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>📔 Havedagbog</h3>
+      <button class="modal-close" onclick="closeModal('journal-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <textarea class="notes" id="journal-entry-text" placeholder="Skriv en observation, en idé, eller hvad der lige nu sker i haven…"></textarea>
+      </div>
+      <button class="primary-btn" onclick="addJournalEntry()">Tilføj til dagbogen</button>
+      <div style="border-top:1px solid var(--line);margin:18px 0 14px;"></div>
+      <div id="journal-entries-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WISHLIST MODAL ===== -->
+<div class="modal-overlay" id="wishlist-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>🌟 Ønskeliste</h3>
+      <button class="modal-close" onclick="closeModal('wishlist-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Plante</label>
+          <input type="text" id="wishlist-name" placeholder="f.eks. Magnolia">
+        </div>
+        <div class="field">
+          <label>Note</label>
+          <input type="text" id="wishlist-note" placeholder="fx “til vestbedet”">
+        </div>
+      </div>
+      <button class="primary-btn" onclick="addWishlistItem()">Tilføj til ønskeliste</button>
+      <div style="border-top:1px solid var(--line);margin:18px 0 14px;"></div>
+      <div id="wishlist-items-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOUR MODAL ===== -->
+<div class="modal-overlay" id="tour-modal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head">
+      <h3 id="tour-title"></h3>
+      <button class="modal-close" onclick="closeModal('tour-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="tour-body" style="font-size:14px;line-height:1.6;color:var(--ink);min-height:80px;"></div>
+      <div class="today-mono" id="tour-progress" style="margin:14px 0 4px;opacity:0.6;"></div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('tour-modal');try{localStorage.setItem('havehjulet_tour_seen','1');}catch(e){}">Spring over</button>
+        <button class="primary-btn" id="tour-next-btn" onclick="tourNext()">Næste</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1058,6 +1141,7 @@
 </div>
 
 <input type="file" id="plant-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePlantPhotoUpload(event)">
+<div id="qr-sheet-print-area" style="position:absolute;left:-9999px;top:-9999px;"></div>
 <div class="toast" id="toast"></div>
 <div class="toast undo-toast" id="undo-toast"><span id="undo-toast-text"></span><button onclick="handleUndoClick()">↩ Fortryd</button></div>
 
@@ -1351,6 +1435,20 @@ let editVertexMarkers = [];
 let editingPolygonPreview = null;
 let selectedType = 'blomst';
 let pickedDb = null; // db entry chosen while adding a plant
+let selectedCustomIcon = null;
+const ICON_PALETTE = ['🌸','🌹','🌻','🌼','🌷','🌺','🌿','🍀','🌵','🌳','🌲','🍁','🟩','🐝','🦋','🍅'];
+
+function buildIconPalette(current){
+  const el = document.getElementById('icon-palette');
+  if(!el) return;
+  el.innerHTML = ICON_PALETTE.map(ic=>
+    `<button type="button" class="${ic===selectedCustomIcon?'active':''}" onclick="pickCustomIcon('${ic}')">${ic}</button>`
+  ).join('') + `<button type="button" class="reset" onclick="pickCustomIcon(null)">Standard</button>`;
+}
+function pickCustomIcon(icon){
+  selectedCustomIcon = icon;
+  buildIconPalette();
+}
 let lastDroughtInfo = null; // { balance, label, cls } from the last weather load, used for watering tips
 let userTypedName = false; // true once the user has typed in the Navn field themselves
 
@@ -1517,6 +1615,7 @@ function enterApp(){
   updateTrashButton();
   updateBellBadge();
   tryOpenDeepLinkedPlant();
+  if(!viewOnlyMode) maybeAutoStartTour();
 }
 
 // ---------- Weather (Open-Meteo, no key needed) ----------
@@ -2257,10 +2356,11 @@ function selectMonth(m, isToday){
 // ---------- Map ----------
 function initMapIfNeeded(){
   if(map) return;
-  map = L.map('map', { zoomControl:true }).setView(
+  map = L.map('map', { zoomControl:false }).setView(
     gardenData.center ? [gardenData.center.lat, gardenData.center.lng] : [56.1629, 10.2039],
     gardenData.zoom || 6
   );
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 20, attribution: 'Tiles &copy; Esri'
   }).addTo(map);
@@ -2377,6 +2477,87 @@ function openActivityModal(){
     body.innerHTML = log.map(entry => `<div class="task-item"><div class="icon">👤</div><div class="txt"><b>${escapeHtml(entry.user||'?')}</b> ${escapeHtml(entry.action)} <b>${escapeHtml(entry.target)}</b><br><span style="opacity:0.6;font-size:11px;">${timeAgo(entry.time)}</span></div></div>`).join('');
   }
   document.getElementById('activity-modal').classList.add('show');
+}
+
+// ---------- Garden diary (not tied to a specific plant) ----------
+function openJournalModal(){
+  document.getElementById('journal-entry-text').value = '';
+  renderJournalEntries();
+  document.getElementById('journal-modal').classList.add('show');
+}
+function renderJournalEntries(){
+  const entries = (gardenData.journal || []).slice().sort((a,b)=>b.date-a.date);
+  const el = document.getElementById('journal-entries-list');
+  if(!entries.length){
+    el.innerHTML = `<div class="empty-note">Ingen dagbogsnotater endnu.</div>`;
+    return;
+  }
+  el.innerHTML = entries.map(e => `<div class="detail-note-box" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px;">
+      <div><span style="font-size:11px;opacity:0.6;font-family:'JetBrains Mono',monospace;">${new Date(e.date).toLocaleDateString('da-DK')}${e.user?' · '+escapeHtml(e.user):''}</span><br>${escapeHtml(e.text)}</div>
+      <button class="pdel" style="position:static;flex-shrink:0;" onclick="deleteJournalEntry('${e.id}')">✕</button>
+    </div>`).join('');
+}
+function addJournalEntry(){
+  const text = document.getElementById('journal-entry-text').value.trim();
+  if(!text) return;
+  if(!gardenData.journal) gardenData.journal = [];
+  gardenData.journal.push({ id:'j'+Date.now()+Math.random().toString(36).slice(2,7), text, date: Date.now(), user: currentUser });
+  saveGarden();
+  document.getElementById('journal-entry-text').value = '';
+  renderJournalEntries();
+  toast('Tilføjet til dagbogen 📔');
+}
+function deleteJournalEntry(id){
+  gardenData.journal = (gardenData.journal||[]).filter(e=>e.id!==id);
+  saveGarden();
+  renderJournalEntries();
+}
+
+// ---------- Wishlist ----------
+function openWishlistModal(){
+  document.getElementById('wishlist-name').value = '';
+  document.getElementById('wishlist-note').value = '';
+  renderWishlistItems();
+  document.getElementById('wishlist-modal').classList.add('show');
+}
+function renderWishlistItems(){
+  const items = gardenData.wishlist || [];
+  const el = document.getElementById('wishlist-items-list');
+  if(!items.length){
+    el.innerHTML = `<div class="empty-note">Ønskelisten er tom.</div>`;
+    return;
+  }
+  el.innerHTML = items.map(w => `<div class="journal-item" style="cursor:default;">
+      <div class="ico">🌟</div>
+      <div class="info" style="flex:1;"><b>${escapeHtml(w.name)}</b>${w.note?`<span>${escapeHtml(w.note)}</span>`:''}</div>
+      <button class="secondary-btn" style="padding:6px 10px;font-size:11px;" onclick="moveWishlistToGarden('${w.id}')">🌱 Til haven</button>
+      <button class="del-addr" onclick="deleteWishlistItem('${w.id}')">✕</button>
+    </div>`).join('');
+}
+function addWishlistItem(){
+  const name = document.getElementById('wishlist-name').value.trim();
+  if(!name){ toast('Angiv et navn'); return; }
+  const note = document.getElementById('wishlist-note').value.trim();
+  if(!gardenData.wishlist) gardenData.wishlist = [];
+  gardenData.wishlist.push({ id:'w'+Date.now()+Math.random().toString(36).slice(2,7), name, note, addedAt: Date.now() });
+  saveGarden();
+  document.getElementById('wishlist-name').value = '';
+  document.getElementById('wishlist-note').value = '';
+  renderWishlistItems();
+  toast('Tilføjet til ønskelisten 🌟');
+}
+function deleteWishlistItem(id){
+  gardenData.wishlist = (gardenData.wishlist||[]).filter(w=>w.id!==id);
+  saveGarden();
+  renderWishlistItems();
+}
+function moveWishlistToGarden(id){
+  const w = (gardenData.wishlist||[]).find(x=>x.id===id);
+  if(!w) return;
+  closeModal('wishlist-modal');
+  gardenData.wishlist = gardenData.wishlist.filter(x=>x.id!==id);
+  saveGarden();
+  trySuggestion(w.name);
 }
 
 function zoomToFitGarden(){
@@ -3055,6 +3236,7 @@ function openAddModal(){
   editingPlantId = null;
   pickedDb = null;
   userTypedName = false;
+  selectedCustomIcon = null;
   selectedType = 'blomst';
   document.getElementById('photo-id-status').textContent = '';
   document.getElementById('photo-id-results').innerHTML = '';
@@ -3070,12 +3252,17 @@ function openAddModal(){
   document.getElementById('plant-notes').value='';
   populateAddressSelects();
   document.getElementById('plant-address-group').value = '';
+  buildIconPalette();
   buildTaskMonthGrid();
   document.getElementById('add-modal').classList.add('show');
   if(pendingSuggestionName){
     const n = pendingSuggestionName;
     pendingSuggestionName = null;
-    pickDb(n);
+    if(PLANT_DB.some(p=>p.name===n)){
+      pickDb(n);
+    } else {
+      applyAutoName(n);
+    }
   }
 }
 function closeModal(id){
@@ -3461,7 +3648,7 @@ function savePlant(){
     bloom: document.getElementById('plant-bloom').value.trim(),
     image: document.getElementById('plant-image').value.trim(),
     notes: document.getElementById('plant-notes').value.trim(),
-    icon: pickedDb ? pickedDb.icon : (selectedType==='blomst'?'🌸':selectedType==='busk'?'🌿':selectedType==='træ'?'🌳':'🟩'),
+    icon: selectedCustomIcon || (pickedDb ? pickedDb.icon : (selectedType==='blomst'?'🌸':selectedType==='busk'?'🌿':selectedType==='træ'?'🌳':'🟩')),
     desc: pickedDb ? pickedDb.desc : '',
     tasks: collectTasksFromFields(),
     bee: BEE_FRIENDLY_NAMES.has(name),
@@ -3740,6 +3927,25 @@ function openQrModal(plantId){
 }
 function printQrLabel(){
   window.print();
+}
+
+function printAllQrLabels(){
+  if(!gardenData.plants.length){ toast('Ingen planter at lave mærker til endnu'); return; }
+  const area = document.getElementById('qr-sheet-print-area');
+  area.innerHTML = gardenData.plants.map(p => `
+    <div class="qr-batch-item">
+      <div style="font-size:22px;">${p.icon||'🌱'}</div>
+      <div style="font-family:'Fraunces',serif;font-weight:600;font-size:12px;color:#28402c;margin:4px 0;">${escapeHtml(p.name)}</div>
+      <div id="qr-batch-${p.id}"></div>
+    </div>`).join('');
+  gardenData.plants.forEach(p=>{
+    const url = `${window.location.origin}/?plant=${encodeURIComponent(p.id)}`;
+    new QRCode(document.getElementById(`qr-batch-${p.id}`), { text: url, width: 90, height: 90, colorDark:'#28402c', colorLight:'#ffffff' });
+  });
+  document.body.classList.add('print-qrsheet-mode');
+  const cleanup = ()=>{ document.body.classList.remove('print-qrsheet-mode'); window.onafterprint = null; };
+  window.onafterprint = cleanup;
+  setTimeout(()=>{ window.print(); setTimeout(cleanup, 1000); }, 150);
 }
 
 // ---------- Detail modal ----------
@@ -4062,14 +4268,41 @@ function logWatering(plantId){
   toast('Registreret 💧');
 }
 
+// ---------- Task completion tracking ----------
+function taskCompletionKey(month, year){
+  return `${year}-${String(month+1).padStart(2,'0')}`;
+}
+function isTaskCompleted(p, month, year){
+  return (p.completedTasks||[]).includes(taskCompletionKey(month, year));
+}
+function toggleTaskCompletion(plantId, month, year){
+  const p = gardenData.plants.find(x=>x.id===plantId);
+  if(!p) return;
+  if(!p.completedTasks) p.completedTasks = [];
+  const key = taskCompletionKey(month, year);
+  const idx = p.completedTasks.indexOf(key);
+  if(idx>-1) p.completedTasks.splice(idx,1);
+  else p.completedTasks.push(key);
+  saveGarden();
+  openDetail(plantId);
+}
+
 function openDetail(id){
   const p = gardenData.plants.find(x=>x.id===id);
   if(!p) return;
   const cm = currentMonthIndex();
+  const cy = new Date().getFullYear();
   const taskEntries = Object.keys(p.tasks||{}).map(k=>parseInt(k)).sort((a,b)=>a-b);
   let tasksHtml = '';
   if(taskEntries.length){
-    tasksHtml = taskEntries.map(m=>`<div class="detail-task-row ${m===cm?'current':''}"><div class="m">${MONTHS[m]}</div><div>${escapeHtml(p.tasks[m])}</div></div>`).join('');
+    tasksHtml = taskEntries.map(m=>{
+      const done = isTaskCompleted(p, m, cy);
+      return `<div class="detail-task-row ${m===cm?'current':''}">
+        <input type="checkbox" style="width:auto;margin-top:2px;" ${done?'checked':''} onchange="toggleTaskCompletion('${p.id}', ${m}, ${cy})">
+        <div class="m">${MONTHS[m]}</div>
+        <div style="${done?'text-decoration:line-through;opacity:0.55;':''}">${escapeHtml(p.tasks[m])}</div>
+      </div>`;
+    }).join('');
   } else {
     tasksHtml = `<div class="empty-note">Ingen specifikke opgaver registreret for denne plante.</div>`;
   }
@@ -4129,6 +4362,8 @@ function editPlant(id){
   document.getElementById('plant-bloom').value = p.bloom||'';
   document.getElementById('plant-image').value = p.image||'';
   document.getElementById('plant-notes').value = p.notes||'';
+  selectedCustomIcon = ICON_PALETTE.includes(p.icon) ? p.icon : null;
+  buildIconPalette();
   populateAddressSelects();
   document.getElementById('plant-address-group').value = p.addressGroup || '';
   buildTaskMonthGrid();
@@ -4231,6 +4466,50 @@ function applyThemeIcon(){
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   btn.textContent = isDark ? '☀️' : '🌙';
 }
+// ---------- Onboarding tour ----------
+const TOUR_STEPS = [
+  { title: 'Velkommen til Havehjulet 🌱', body: 'En hurtig rundvisning på 30 sekunder — spring over når som helst, og find den her igen via ❓ i toppen.' },
+  { title: '🗓️ Årshjulet', body: 'Forsiden viser hvad der sker i haven lige nu — klik på en måned i hjulet for at se dens opgaver, både for dine egne planter og generelt.' },
+  { title: '🗺️ Havekort', body: 'Under "Havekort" kan du søge din adresse frem på satellitfoto og gemme den. Klik "+ Tilføj plante" eller "▱ Tilføj bed", og klik derefter på kortet for at placere den.' },
+  { title: '🔍 Søg efter planter', body: 'Når du tilføjer en plante, kan du søge i vores bibliotek eller online (Perenual, Trefle, GBIF, og foto-genkendelse med Pl@ntNet) — pasningsinfo udfyldes automatisk.' },
+  { title: '🐌☀️📏 Værktøjer på kortet', body: 'Flere små værktøjer venter på kortet: registrér skadedyr, se solens retning, mål afstande, og print kortet eller hele haveplanen som PDF.' },
+  { title: '⚙️ Indstillinger', body: 'Her kan du sætte e-mail-påmindelser op, dele din have med andre i husstanden, tage backup, eller slå mørkt tema til. God fornøjelse! 🌻' }
+];
+let tourStep = 0;
+
+function startTour(){
+  tourStep = 0;
+  renderTourStep();
+  document.getElementById('tour-modal').classList.add('show');
+}
+
+function renderTourStep(){
+  const step = TOUR_STEPS[tourStep];
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-body').textContent = step.body;
+  document.getElementById('tour-progress').textContent = `${tourStep+1} af ${TOUR_STEPS.length}`;
+  document.getElementById('tour-next-btn').textContent = (tourStep === TOUR_STEPS.length-1) ? 'Forstået!' : 'Næste';
+}
+
+function tourNext(){
+  tourStep++;
+  if(tourStep >= TOUR_STEPS.length){
+    closeModal('tour-modal');
+    try{ localStorage.setItem('havehjulet_tour_seen', '1'); }catch(e){}
+    return;
+  }
+  renderTourStep();
+}
+
+function maybeAutoStartTour(){
+  try{
+    if(!localStorage.getItem('havehjulet_tour_seen')){
+      localStorage.setItem('havehjulet_tour_seen', '1');
+      setTimeout(startTour, 600);
+    }
+  }catch(e){}
+}
+
 function toggleDarkMode(){
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   if(isDark){
