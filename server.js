@@ -754,6 +754,27 @@ app.get('/api/admin/stats', authMiddleware, adminOnly, (req, res) => {
   });
 });
 
+// Catches errors from middleware like multer (e.g. file too large) and any
+// route that calls next(err), so the client always gets JSON instead of
+// nginx/Express falling back to an HTML error page or a process crash.
+app.use((err, req, res, next) => {
+  console.error('Unhandled route error:', err);
+  if(err && err.code === 'LIMIT_FILE_SIZE'){
+    return res.status(400).json({ error: 'Filen er for stor (maks 10 MB)' });
+  }
+  res.status(500).json({ error: 'Der opstod en uventet serverfejl' });
+});
+
+// Log crashes clearly in the journal instead of dying silently, and exit so
+// systemd (Restart=on-failure) brings the process back up cleanly.
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION — genstarter processen:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled promise rejection:', err);
+});
+
 app.listen(PORT, () => {
   console.log(`Havehjulet kører på port ${PORT}`);
 });
