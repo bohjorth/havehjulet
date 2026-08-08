@@ -12,6 +12,12 @@ const { readDb, writeDb } = require('./db');
 const { sendMail } = require('./mailer');
 
 const app = express();
+// Express auto-generates ETags for every res.json()/res.send() response.
+// For API endpoints that's actively harmful: a repeated identical query
+// (e.g. searching the same address twice) gets back an empty 304 Not
+// Modified instead of the actual data, which broke address search.
+// API responses should never be treated as cacheable static content.
+app.set('etag', false);
 const PORT = process.env.PORT || 3000;
 
 // Wraps fetch with a timeout so a slow/hanging upstream API (Perenual,
@@ -73,6 +79,10 @@ const authLimiter = rateLimit({
 });
 
 app.use(express.json({ limit: '2mb' }));
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '30d' }));
 
