@@ -394,6 +394,24 @@ app.post('/api/reset-password', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Address geocoding proxy (Nominatim requires an identifying
+// User-Agent that browsers won't let client-side JS set — so the server
+// makes the request instead, which also avoids Nominatim blocking the app). ----------
+app.get('/api/geocode', authMiddleware, async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if(!q) return res.json([]);
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Havehjulet/1.0 (self-hosted garden app)' }
+    });
+    const data = await r.json();
+    res.json(data);
+  }catch(e){
+    res.status(502).json({ error: 'Kunne ikke kontakte adressetjenesten' });
+  }
+});
+
 // ---------- Perenual proxy (keeps the API key server-side only) ----------
 app.get('/api/plants/search', authMiddleware, async (req, res) => {
   if(!PERENUAL_API_KEY) return res.status(503).json({ error: 'Ingen Perenual-nøgle sat op på serveren' });

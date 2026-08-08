@@ -2767,8 +2767,7 @@ async function searchAddress(){
   if(!q){ box.innerHTML=''; return; }
   box.innerHTML = '<div style="opacity:0.6;">Søger…</div>';
   try{
-    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&q=' + encodeURIComponent(q));
-    const data = await res.json();
+    const data = await apiFetch(`/geocode?q=${encodeURIComponent(q)}`);
     if(!data.length){ box.innerHTML = '<div style="opacity:0.6;">Ingen resultater</div>'; return; }
     box.innerHTML = data.map((d,i)=>`<div onclick="pickAddress(${i})">${escapeHtml(d.display_name)}</div>`).join('');
     window._addrResults = data;
