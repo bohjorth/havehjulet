@@ -735,6 +735,7 @@
           <div class="add-mode-banner" id="area-mode-banner"></div>
           <div class="add-mode-banner" id="pest-mode-banner">Klik hvor du ser skadedyr/sygdom 🐌</div>
           <div class="add-mode-banner" id="measure-mode-banner">Klik to punkter på kortet for at måle afstanden 📏</div>
+          <div class="add-mode-banner" id="move-plant-banner">Klik hvor planten skal stå <button class="mini-btn cancel" onclick="cancelMovePlant()">✕ Annullér</button></div>
           <div class="add-mode-banner" id="shape-edit-banner">Træk i de gyldne hjørner for at ændre formen — klik på et hjørne for at fjerne det.
             <button class="mini-btn finish" onclick="saveShapeEdit()">✓ Gem form</button>
             <button class="mini-btn cancel" onclick="cancelShapeEdit()">✕ Annullér</button>
@@ -808,7 +809,7 @@
 
       <div class="field">
         <label>Navn (dit eget, f.eks. “Rose ved terrassen”)</label>
-        <input type="text" id="plant-name">
+        <input type="text" id="plant-name" oninput="markNameEdited()">
       </div>
 
       <div class="field-row">
@@ -1308,6 +1309,7 @@ let pestMode = false;
 let measureMode = false;
 let measurePoints = [];
 let measureLayer = null;
+let movingPlantId = null;
 let pendingPestLatLng = null;
 let addMode = false;
 let areaMode = false;
@@ -1320,19 +1322,17 @@ let editingPolygonPreview = null;
 let selectedType = 'blomst';
 let pickedDb = null; // db entry chosen while adding a plant
 let lastDroughtInfo = null; // { balance, label, cls } from the last weather load, used for watering tips
-let lastAutoFilledName = null; // tracks the last name we filled in automatically, so we don't clobber a name the user typed themselves
+let userTypedName = false; // true once the user has typed in the Navn field themselves
 
-// Fills the "Navn" field with an auto-found name, but only if the field is
-// still empty or still holds a previous auto-fill — never overwrites a name
-// the user typed in themselves.
+function markNameEdited(){
+  userTypedName = true;
+}
+
+// Fills the "Navn" field with an auto-found name, but only if the user
+// hasn't typed their own name into the field first.
 function applyAutoName(name){
-  if(!name) return;
-  const field = document.getElementById('plant-name');
-  const current = field.value.trim();
-  if(!current || current === lastAutoFilledName){
-    field.value = name;
-  }
-  lastAutoFilledName = name;
+  if(!name || userTypedName) return;
+  document.getElementById('plant-name').value = name;
 }
 let editingPlantId = null;
 let pendingLatLng = null;
@@ -2163,6 +2163,10 @@ function initMapIfNeeded(){
   renderPestMarkers();
 
   map.on('click', (e)=>{
+    if(movingPlantId){
+      finishMovePlant(e.latlng);
+      return;
+    }
     if(addMode){
       pendingLatLng = e.latlng;
       openAddModal();
@@ -2879,7 +2883,7 @@ function collectTasksFromFields(){
 function openAddModal(){
   editingPlantId = null;
   pickedDb = null;
-  lastAutoFilledName = null;
+  userTypedName = false;
   selectedType = 'blomst';
   document.getElementById('photo-id-status').textContent = '';
   document.getElementById('photo-id-results').innerHTML = '';
@@ -3690,6 +3694,53 @@ function addMeasurePoint(latlng){
   measurePoints = [];
 }
 
+// ---------- Move an existing plant/bed ----------
+function startMovePlant(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p) return;
+  closeModal('detail-modal');
+  switchView('map');
+
+  addMode = false; areaMode = false; pestMode = false; measureMode = false;
+  clearMeasure();
+  resetAreaDrawing();
+  document.getElementById('add-toggle-btn').classList.remove('active');
+  document.getElementById('add-mode-banner').classList.remove('show');
+  document.getElementById('pest-toggle-btn').classList.remove('active');
+  document.getElementById('pest-mode-banner').classList.remove('show');
+  document.getElementById('measure-toggle-btn').classList.remove('active');
+  document.getElementById('measure-mode-banner').classList.remove('show');
+
+  movingPlantId = id;
+  document.getElementById('move-plant-banner').classList.add('show');
+  toast(`Flytter "${p.name}" — klik det nye sted på kortet`);
+}
+
+function cancelMovePlant(){
+  movingPlantId = null;
+  document.getElementById('move-plant-banner').classList.remove('show');
+}
+
+function finishMovePlant(latlng){
+  const p = gardenData.plants.find(x=>x.id===movingPlantId);
+  movingPlantId = null;
+  document.getElementById('move-plant-banner').classList.remove('show');
+  if(!p) return;
+
+  if(p.polygon && p.polygon.length){
+    const dLat = latlng.lat - p.lat;
+    const dLng = latlng.lng - p.lng;
+    p.polygon = p.polygon.map(pt => ({ lat: pt.lat + dLat, lng: pt.lng + dLng }));
+  }
+  p.lat = latlng.lat;
+  p.lng = latlng.lng;
+
+  saveGarden();
+  renderMarkers();
+  renderJournal();
+  toast(`"${p.name}" flyttet 📍`);
+}
+
 
 function renderPhotoGallery(p){
   const photos = (p.photos || []).slice().sort((a,b)=> a.date.localeCompare(b.date));
@@ -3838,6 +3889,7 @@ function openDetail(id){
       <button class="secondary-btn delete-plant-btn" onclick="deletePlant('${p.id}')">Slet plante</button>
       <button class="secondary-btn" onclick="openQrModal('${p.id}')">🔖 QR-mærke</button>
       <button class="secondary-btn" onclick="duplicatePlant('${p.id}')">📋 Dupliker</button>
+      <button class="secondary-btn" onclick="startMovePlant('${p.id}')">📍 Flyt</button>
       ${p.polygon ? `<button class="secondary-btn" onclick="startShapeEdit('${p.id}')">✎ Ret form</button>` : ''}
       <button class="primary-btn" onclick="editPlant('${p.id}')">Redigér</button>
     </div>`}
@@ -3851,7 +3903,7 @@ function editPlant(id){
   closeModal('detail-modal');
   editingPlantId = id;
   pickedDb = null;
-  lastAutoFilledName = null;
+  userTypedName = true;
   pendingLatLng = null;
   pendingPolygon = null;
   resetAreaDrawing();
