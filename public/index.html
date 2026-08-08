@@ -324,6 +324,7 @@
   .map-toolbar{
     position:absolute;top:14px;left:14px;right:14px;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;
   }
+  .map-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;}
   .addr-search{
     flex:1;min-width:220px;display:flex;background:var(--surface);border-radius:9px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line);
   }
@@ -464,7 +465,12 @@
     .journal{max-height:34vh;border-right:none;border-bottom:1px solid var(--line);}
     .journal-list{max-height:none;}
     #map{height:56vh;min-height:340px;}
-    .map-toolbar{top:10px;left:10px;right:10px;gap:6px;}
+    .map-toolbar{top:10px;left:10px;right:10px;gap:6px;flex-direction:column;align-items:stretch;}
+    .map-toolbar-actions{
+      flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin;
+      -webkit-overflow-scrolling:touch;
+    }
+    .map-toolbar-actions .toggle-add-btn{flex:0 0 auto;white-space:nowrap;}
     .addr-search input, .journal-search, .field input, textarea.notes, #db-search{font-size:16px;}
     .toggle-add-btn{padding:10px 12px;font-size:12.5px;}
     .add-mode-banner{left:10px;right:10px;transform:none;width:auto;text-align:center;}
@@ -714,13 +720,15 @@
               <button onclick="searchAddress()">Søg</button>
               <div class="addr-suggestions" id="addr-suggestions"></div>
             </div>
-            <button class="toggle-add-btn" id="save-addr-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
-            <button class="toggle-add-btn" id="add-toggle-btn" onclick="toggleAddMode()">+ Tilføj plante</button>
-            <button class="toggle-add-btn" id="area-toggle-btn" onclick="toggleAreaMode()">▱ Tilføj bed</button>
-            <button class="toggle-add-btn" id="sun-toggle-btn" onclick="toggleSunOverlay()">☀️ Sol</button>
-            <button class="toggle-add-btn" id="pest-toggle-btn" onclick="togglePestMode()">🐌 Skadedyr</button>
-            <button class="toggle-add-btn" id="bloom-toggle-btn" onclick="toggleBloomFilter()">🌸 Blomstrer nu</button>
-            <button class="toggle-add-btn" style="background:var(--soil);" onclick="printMap()">🖨️ Print kort</button>
+            <div class="map-toolbar-actions">
+              <button class="toggle-add-btn" id="save-addr-btn" style="background:var(--moss);" onclick="openAddressModal()">💾 Gem adresse</button>
+              <button class="toggle-add-btn" id="add-toggle-btn" onclick="toggleAddMode()">+ Tilføj plante</button>
+              <button class="toggle-add-btn" id="area-toggle-btn" onclick="toggleAreaMode()">▱ Tilføj bed</button>
+              <button class="toggle-add-btn" id="sun-toggle-btn" onclick="toggleSunOverlay()">☀️ Sol</button>
+              <button class="toggle-add-btn" id="pest-toggle-btn" onclick="togglePestMode()">🐌 Skadedyr</button>
+              <button class="toggle-add-btn" id="bloom-toggle-btn" onclick="toggleBloomFilter()">🌸 Blomstrer nu</button>
+              <button class="toggle-add-btn" style="background:var(--soil);" onclick="printMap()">🖨️ Print kort</button>
+            </div>
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
           <div class="add-mode-banner" id="area-mode-banner"></div>
@@ -898,6 +906,28 @@
         <input type="text" id="global-search-input" placeholder="Søg planter, adresser, skadedyr…" oninput="renderGlobalSearch()" autocomplete="off">
       </div>
       <div id="global-search-results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DELETE ACCOUNT MODAL ===== -->
+<div class="modal-overlay" id="delete-account-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Slet konto permanent</h3>
+      <button class="modal-close" onclick="closeModal('delete-account-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="empty-note" style="margin-bottom:14px;">Dette kan ikke fortrydes. Indtast din adgangskode for at bekræfte.</div>
+      <div class="field">
+        <label>Adgangskode</label>
+        <input type="password" id="delete-account-password" placeholder="••••••••">
+      </div>
+      <div class="auth-msg" id="delete-account-msg"></div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="closeModal('delete-account-modal')">Annuller</button>
+        <button class="primary-btn" style="background:#a83223;" onclick="confirmDeleteAccount()">Slet permanent</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1570,6 +1600,32 @@ function exportGardenJson(){
   toast('Havedata downloadet');
 }
 
+// ---------- Delete account ----------
+function openDeleteAccountConfirm(){
+  document.getElementById('delete-account-password').value = '';
+  document.getElementById('delete-account-msg').className = 'auth-msg';
+  document.getElementById('delete-account-modal').classList.add('show');
+}
+
+async function confirmDeleteAccount(){
+  const password = document.getElementById('delete-account-password').value;
+  if(!password){
+    document.getElementById('delete-account-msg').className = 'auth-msg show error';
+    document.getElementById('delete-account-msg').textContent = 'Indtast din adgangskode.';
+    return;
+  }
+  try{
+    await apiFetch('/account/delete', {method:'POST', body: JSON.stringify({password})});
+    closeModal('delete-account-modal');
+    closeModal('settings-modal');
+    toast('Din konto er slettet');
+    setTimeout(handleLogout, 800);
+  }catch(e){
+    document.getElementById('delete-account-msg').className = 'auth-msg show error';
+    document.getElementById('delete-account-msg').textContent = e.message || 'Kunne ikke slette kontoen.';
+  }
+}
+
 async function importGardenJson(e){
   const file = e.target.files[0];
   e.target.value = '';
@@ -1718,6 +1774,11 @@ function renderSettingsBody(acc){
       <button class="secondary-btn" style="flex:1;" onclick="document.getElementById('import-garden-input').click()">⬆️ Importér havedata</button>
     </div>
     <input type="file" id="import-garden-input" accept="application/json,.json" style="display:none;" onchange="importGardenJson(event)">
+
+    <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
+    <h4 style="margin:0 0 10px;font-size:14px;color:#a83223;">Slet konto</h4>
+    <div class="empty-note" style="margin-bottom:10px;">Sletter din konto permanent. Er du eneste medlem af din have, slettes havedata også. Overvej at eksportere en backup ovenfor først.</div>
+    <button class="secondary-btn delete-plant-btn" style="width:100%;" onclick="openDeleteAccountConfirm()">🗑 Slet min konto</button>
   `;
 }
 
@@ -2019,8 +2080,8 @@ function selectMonth(m, isToday){
 
   if(plantTasks.length){
     html += `<div class="task-group"><h4>Dine planter</h4>`;
-    plantTasks.forEach(p=>{
-      html += `<div class="task-item"><div class="icon">${p.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(p.name)}</b> — ${escapeHtml(p.tasks[m])}</div></div>`;
+    dedupeTaskLines(plantTasks, m).forEach(item=>{
+      html += `<div class="task-item"><div class="icon">${item.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(item.name)}${item.count>1?' (×'+item.count+')':''}</b> — ${escapeHtml(item.task)}</div></div>`;
     });
     html += `</div>`;
   } else {
@@ -3795,6 +3856,18 @@ function purgeOldTrash(){
 }
 
 // ---------- Notification bell ----------
+// Collapses plants that share the exact same name and task text this month
+// into a single line (with a ×N count), so duplicates don't clutter the view.
+function dedupeTaskLines(plantTasks, month){
+  const seen = new Map();
+  plantTasks.forEach(p=>{
+    const key = p.name + '|' + p.tasks[month];
+    if(seen.has(key)) seen.get(key).count++;
+    else seen.set(key, { icon: p.icon, name: p.name, task: p.tasks[month], count: 1 });
+  });
+  return Array.from(seen.values());
+}
+
 function currentMonthTaskList(){
   const month = currentMonthIndex();
   const plantTasks = gardenData.plants.filter(p => p.tasks && p.tasks[month]);
@@ -3804,8 +3877,8 @@ function currentMonthTaskList(){
 function updateBellBadge(){
   const badge = document.getElementById('bell-badge');
   if(!badge) return;
-  const { plantTasks } = currentMonthTaskList();
-  const n = plantTasks.length;
+  const { plantTasks, month } = currentMonthTaskList();
+  const n = dedupeTaskLines(plantTasks, month).length;
   if(n){ badge.textContent = n; badge.style.display = 'flex'; }
   else { badge.style.display = 'none'; }
 }
@@ -3815,7 +3888,7 @@ function openBellModal(){
   const body = document.getElementById('bell-body');
   let html = `<div class="today-mono" style="margin-bottom:14px;opacity:0.7;">${MONTHS_FULL[month].charAt(0).toUpperCase()+MONTHS_FULL[month].slice(1)}</div>`;
   if(plantTasks.length){
-    html += plantTasks.map(p=>`<div class="task-item"><div class="icon">${p.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(p.name)}</b> — ${escapeHtml(p.tasks[month])}</div></div>`).join('');
+    html += dedupeTaskLines(plantTasks, month).map(item=>`<div class="task-item"><div class="icon">${item.icon||'🌱'}</div><div class="txt"><b>${escapeHtml(item.name)}${item.count>1?' (×'+item.count+')':''}</b> — ${escapeHtml(item.task)}</div></div>`).join('');
   } else {
     html += `<div class="empty-note">Ingen af dine planter har specifikke opgaver denne måned.</div>`;
   }

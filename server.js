@@ -237,6 +237,46 @@ app.post('/api/garden/leave', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Delete own account ----------
+app.post('/api/account/delete', authMiddleware, async (req, res) => {
+  const password = String(req.body.password || '');
+  const db = readDb();
+  const user = db.users[req.username];
+  if(!user) return res.status(404).json({ error: 'Konto ikke fundet' });
+  const ok = await bcrypt.compare(password, user.hash);
+  if(!ok) return res.status(401).json({ error: 'Forkert adgangskode' });
+
+  const gardenId = req.gardenId;
+  // Remove them from their garden's member list. If they were the sole
+  // member of a garden that isn't their own username's garden, or it IS
+  // their own garden with no one else in it, delete that garden's data too.
+  if(db.gardens[gardenId] && db.gardens[gardenId].members){
+    db.gardens[gardenId].members = db.gardens[gardenId].members.filter(m => m !== req.username);
+  }
+  if(db.gardens[req.username] && (!db.gardens[req.username].members || !db.gardens[req.username].members.length)){
+    delete db.gardens[req.username];
+  }
+  if(gardenId !== req.username && db.gardens[gardenId] && !db.gardens[gardenId].members.length){
+    delete db.gardens[gardenId];
+  }
+
+  // Remove all of this user's sessions, not just the current one.
+  Object.keys(db.sessions).forEach(token => {
+    if(db.sessions[token].username === req.username) delete db.sessions[token];
+  });
+  // Remove any invites/share links tied to their own (now-deleted) garden.
+  Object.keys(db.invites).forEach(code => {
+    if(db.invites[code].gardenId === req.username) delete db.invites[code];
+  });
+  Object.keys(db.shareLinks).forEach(token => {
+    if(db.shareLinks[token].gardenId === req.username) delete db.shareLinks[token];
+  });
+
+  delete db.users[req.username];
+  writeDb(db);
+  res.json({ ok: true });
+});
+
 // ---------- Read-only share links (no login required to view) ----------
 app.get('/api/garden/share', authMiddleware, (req, res) => {
   const db = readDb();
