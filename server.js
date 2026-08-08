@@ -13,6 +13,20 @@ const { sendMail } = require('./mailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Wraps fetch with a timeout so a slow/hanging upstream API (Perenual,
+// Trefle, etc.) always fails fast with a proper JSON error, instead of
+// hanging until nginx's own proxy timeout kicks in and returns an HTML
+// error page that breaks the frontend's JSON parsing.
+async function fetchWithTimeout(url, options = {}, ms = 9000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try{
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const PERENUAL_API_KEY = process.env.PERENUAL_API_KEY || '';
 const TREFLE_API_KEY = process.env.TREFLE_API_KEY || '';
 const PLANTNET_API_KEY = process.env.PLANTNET_API_KEY || '';
@@ -419,11 +433,11 @@ app.get('/api/plants/search', authMiddleware, async (req, res) => {
   if(!q) return res.json({ data: [] });
   try{
     const url = `https://perenual.com/api/species-list?key=${encodeURIComponent(PERENUAL_API_KEY)}&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url);
     const data = await r.json();
     res.json(data);
   }catch(e){
-    res.status(502).json({ error: 'Kunne ikke kontakte Perenual' });
+    res.status(502).json({ error: e.name==='AbortError' ? 'Perenual svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Perenual' });
   }
 });
 
@@ -432,7 +446,7 @@ app.get('/api/plants/details/:id', authMiddleware, async (req, res) => {
   const id = String(req.params.id).replace(/[^0-9]/g, '');
   try{
     const url = `https://perenual.com/api/species/details/${id}?key=${encodeURIComponent(PERENUAL_API_KEY)}`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url);
     const data = await r.json();
     if(!r.ok){
       console.error('Perenual details fejl:', r.status, JSON.stringify(data));
@@ -441,7 +455,7 @@ app.get('/api/plants/details/:id', authMiddleware, async (req, res) => {
     res.json(data);
   }catch(e){
     console.error('Perenual details exception:', e.message);
-    res.status(502).json({ error: 'Kunne ikke kontakte Perenual' });
+    res.status(502).json({ error: e.name==='AbortError' ? 'Perenual svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Perenual' });
   }
 });
 
@@ -452,11 +466,11 @@ app.get('/api/trefle/search', authMiddleware, async (req, res) => {
   if(!q) return res.json({ data: [] });
   try{
     const url = `https://trefle.io/api/v1/plants/search?token=${encodeURIComponent(TREFLE_API_KEY)}&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url);
     const data = await r.json();
     res.json(data);
   }catch(e){
-    res.status(502).json({ error: 'Kunne ikke kontakte Trefle' });
+    res.status(502).json({ error: e.name==='AbortError' ? 'Trefle svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Trefle' });
   }
 });
 
@@ -465,11 +479,11 @@ app.get('/api/trefle/details/:id', authMiddleware, async (req, res) => {
   const id = String(req.params.id).replace(/[^0-9]/g, '');
   try{
     const url = `https://trefle.io/api/v1/plants/${id}?token=${encodeURIComponent(TREFLE_API_KEY)}`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url);
     const data = await r.json();
     res.json(data);
   }catch(e){
-    res.status(502).json({ error: 'Kunne ikke kontakte Trefle' });
+    res.status(502).json({ error: e.name==='AbortError' ? 'Trefle svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Trefle' });
   }
 });
 
@@ -483,11 +497,16 @@ app.post('/api/plantnet/identify', authMiddleware, upload.single('image'), async
     form.append('images', blob, req.file.originalname || 'photo.jpg');
     form.append('organs', 'auto');
     const url = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(PLANTNET_API_KEY)}&lang=da`;
-    const r = await fetch(url, { method: 'POST', body: form });
+    const r = await fetchWithTimeout(url, { method: 'POST', body: form }, 20000);
     const data = await r.json();
-    res.status(r.status).json(data);
+    if(!r.ok){
+      console.error('Pl@ntNet fejl:', r.status, JSON.stringify(data));
+      return res.status(r.status).json({ error: data.message || data.error || `Pl@ntNet svarede med status ${r.status}` });
+    }
+    res.json(data);
   }catch(e){
-    res.status(502).json({ error: 'Kunne ikke kontakte Pl@ntNet' });
+    console.error('Pl@ntNet exception:', e.message);
+    res.status(502).json({ error: e.name==='AbortError' ? 'Pl@ntNet svarede ikke i tide (timeout)' : 'Kunne ikke kontakte Pl@ntNet' });
   }
 });
 
@@ -644,7 +663,7 @@ async function checkFrostAlerts(){
     if(!addr) continue;
     try{
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${addr.lat}&longitude=${addr.lng}&daily=temperature_2m_min&timezone=auto&forecast_days=3`;
-      const r = await fetch(url);
+      const r = await fetchWithTimeout(url);
       const data = await r.json();
       const mins = (data.daily && data.daily.temperature_2m_min) || [];
       const dates = (data.daily && data.daily.time) || [];
