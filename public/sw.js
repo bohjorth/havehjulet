@@ -47,3 +47,27 @@ self.addEventListener('fetch', (event) => {
     }).catch(() => caches.match(req).then((cached) => cached || caches.match('/')))
   );
 });
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'Havehjulet', body: 'Der er nyt i din have.' };
+  try{ if(event.data) data = event.data.json(); }catch(e){}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Havehjulet', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png'
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then((clients) => {
+      for(const client of clients){
+        if('focus' in client) return client.focus();
+      }
+      if(self.clients.openWindow) return self.clients.openWindow('/');
+    })
+  );
+});

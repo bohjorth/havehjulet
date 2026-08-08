@@ -7,6 +7,7 @@ const fs = require('fs');
 const multer = require('multer');
 const cron = require('node-cron');
 const rateLimit = require('express-rate-limit');
+const webpush = require('web-push');
 const { readDb, writeDb } = require('./db');
 const { sendMail } = require('./mailer');
 
@@ -18,6 +19,16 @@ const PLANTNET_API_KEY = process.env.PLANTNET_API_KEY || '';
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
 const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
 const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+const PUSH_ENABLED = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+if(PUSH_ENABLED){
+  webpush.setVapidDetails(
+    `mailto:${process.env.SMTP_FROM || 'admin@localhost'}`,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
 
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -472,6 +483,63 @@ app.post('/api/upload-image', authMiddleware, upload.single('image'), (req, res)
   res.json({ url: `/uploads/${filename}` });
 });
 
+// ---------- Web push notifications ----------
+app.get('/api/push/public-key', authMiddleware, (req, res) => {
+  res.json({ key: VAPID_PUBLIC_KEY, enabled: PUSH_ENABLED });
+});
+
+app.post('/api/push/subscribe', authMiddleware, (req, res) => {
+  if(!PUSH_ENABLED) return res.status(503).json({ error: 'Push-notifikationer er ikke sat op på serveren' });
+  const sub = req.body.subscription;
+  if(!sub || !sub.endpoint) return res.status(400).json({ error: 'Ugyldigt abonnement' });
+  const db = readDb();
+  const user = db.users[req.username];
+  if(!user.pushSubscriptions) user.pushSubscriptions = [];
+  if(!user.pushSubscriptions.some(s => s.endpoint === sub.endpoint)){
+    user.pushSubscriptions.push(sub);
+  }
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', authMiddleware, (req, res) => {
+  const endpoint = req.body.endpoint;
+  const db = readDb();
+  const user = db.users[req.username];
+  if(user.pushSubscriptions){
+    user.pushSubscriptions = user.pushSubscriptions.filter(s => s.endpoint !== endpoint);
+  }
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/test', authMiddleware, async (req, res) => {
+  if(!PUSH_ENABLED) return res.status(503).json({ error: 'Push-notifikationer er ikke sat op på serveren' });
+  const db = readDb();
+  const user = db.users[req.username];
+  if(!user.pushSubscriptions || !user.pushSubscriptions.length){
+    return res.status(400).json({ error: 'Ingen aktive push-abonnementer på denne konto' });
+  }
+  await sendPushToUser(db, req.username, { title: 'Havehjulet', body: 'Sådan her ser en push-notifikation ud! 🌱' });
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+async function sendPushToUser(db, username, payload){
+  const user = db.users[username];
+  if(!PUSH_ENABLED || !user || !user.pushSubscriptions || !user.pushSubscriptions.length) return;
+  const stillValid = [];
+  for(const sub of user.pushSubscriptions){
+    try{
+      await webpush.sendNotification(sub, JSON.stringify(payload));
+      stillValid.push(sub);
+    }catch(err){
+      if(err.statusCode !== 410 && err.statusCode !== 404) stillValid.push(sub); // drop only dead subscriptions
+    }
+  }
+  user.pushSubscriptions = stillValid;
+}
+
 // ---------- Monthly reminder emails ----------
 const GENERIC_TASKS = {
   0:'Planlæg årets have og bestil frø, mens jorden hviler',
@@ -510,23 +578,31 @@ async function runMonthlyReminders(targetUsername){
 
   for(const username of usernames){
     const user = db.users[username];
-    if(!user || !user.email || !user.remindersEnabled) continue;
+    if(!user) continue;
     const gardenId = resolveGardenId(db, username).gardenId;
-    const body = buildMonthEmailBody(gardenId, month, db);
-    const mail = {
-      to: user.email,
-      subject: `Havehjulet — det sker i din have i ${MONTHS_FULL[month]}`,
-      text: `Hej ${username}\n\nHer er hvad der er værd at kigge på i haven i ${MONTHS_FULL[month]}:\n\n${body}\n\nÅbn Havehjulet for flere detaljer.`
-    };
-    if(user.backupEmailEnabled){
-      const garden = db.gardens[gardenId] || emptyGarden();
-      mail.attachments = [{
-        filename: `havehjulet-backup-${new Date().toISOString().slice(0,10)}.json`,
-        content: JSON.stringify(garden, null, 2)
-      }];
-      mail.text += `\n\nDin havedata er vedhæftet som backup (JSON-fil).`;
+    if(user.email && user.remindersEnabled){
+      const body = buildMonthEmailBody(gardenId, month, db);
+      const mail = {
+        to: user.email,
+        subject: `Havehjulet — det sker i din have i ${MONTHS_FULL[month]}`,
+        text: `Hej ${username}\n\nHer er hvad der er værd at kigge på i haven i ${MONTHS_FULL[month]}:\n\n${body}\n\nÅbn Havehjulet for flere detaljer.`
+      };
+      if(user.backupEmailEnabled){
+        const garden = db.gardens[gardenId] || emptyGarden();
+        mail.attachments = [{
+          filename: `havehjulet-backup-${new Date().toISOString().slice(0,10)}.json`,
+          content: JSON.stringify(garden, null, 2)
+        }];
+        mail.text += `\n\nDin havedata er vedhæftet som backup (JSON-fil).`;
+      }
+      await sendMail(mail);
     }
-    await sendMail(mail);
+    if(user.remindersEnabled && PUSH_ENABLED && user.pushSubscriptions && user.pushSubscriptions.length){
+      await sendPushToUser(db, username, {
+        title: `Havehjulet — ${MONTHS_FULL[month]}`,
+        body: `Der er nye have-opgaver klar til dig denne måned. Tryk for at se dem.`
+      });
+    }
   }
   writeDb(db); // persists any gardenId migration from resolveGardenId
 }
@@ -537,7 +613,8 @@ async function checkFrostAlerts(){
   let changed = false;
   for(const username of Object.keys(db.users)){
     const user = db.users[username];
-    if(!user.email || !user.frostAlertsEnabled) continue;
+    const hasPush = PUSH_ENABLED && user.pushSubscriptions && user.pushSubscriptions.length;
+    if(!user.frostAlertsEnabled || !(user.email || hasPush)) continue;
     const gardenId = resolveGardenId(db, username).gardenId;
     const garden = db.gardens[gardenId];
     const addr = garden && garden.addresses && garden.addresses[0];
@@ -552,11 +629,19 @@ async function checkFrostAlerts(){
       if(frostIdx === -1) continue;
       const frostDate = dates[frostIdx];
       if(user.lastFrostAlertDate === frostDate) continue; // already alerted for this exact night
-      await sendMail({
-        to: user.email,
-        subject: `❄️ Frostrisiko i din have — ${frostDate}`,
-        text: `Hej ${username}\n\nDer er varslet frost (ned til ${mins[frostIdx]}°C) ved "${addr.name}" den ${frostDate}. Overvej at dække sarte planter til eller hente potteplanter ind.\n\nÅbn Havehjulet for detaljer.`
-      });
+      if(user.email){
+        await sendMail({
+          to: user.email,
+          subject: `❄️ Frostrisiko i din have — ${frostDate}`,
+          text: `Hej ${username}\n\nDer er varslet frost (ned til ${mins[frostIdx]}°C) ved "${addr.name}" den ${frostDate}. Overvej at dække sarte planter til eller hente potteplanter ind.\n\nÅbn Havehjulet for detaljer.`
+        });
+      }
+      if(hasPush){
+        await sendPushToUser(db, username, {
+          title: '❄️ Frostrisiko i din have',
+          body: `Ned til ${mins[frostIdx]}°C ved "${addr.name}" den ${frostDate}. Dæk sarte planter til.`
+        });
+      }
       user.lastFrostAlertDate = frostDate;
       changed = true;
     }catch(e){

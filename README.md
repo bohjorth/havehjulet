@@ -126,6 +126,19 @@ Hver bruger slår selv påmindelser til/fra og angiver sin e-mail under ⚙ Inds
 ## Admin-overblik (valgfrit)
 Sæt `ADMIN_USERNAME=dit-brugernavn` i `.env` for at give netop den konto adgang til et lille read-only overblik (🛠-ikon i toppen) over alle brugere, haver og lagerforbrug. Efterlad tom for at slå det fra.
 
+## Push-notifikationer (valgfrit)
+For at slå rigtige telefon/browser-notifikationer til (frostvarsler + månedlige påmindelser), generér et VAPID-nøglepar på serveren:
+```bash
+cd /opt/havehjulet
+npx web-push generate-vapid-keys
+```
+Indsæt de to nøgler i `.env`:
+```
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+```
+Genstart servicen. Hver bruger slår det så selv til under ⚙ Indstillinger → Push-notifikationer, på hver enhed de vil have notifikationer på.
+
 ## Opdatering af appen senere
 ```bash
 systemctl stop havehjulet

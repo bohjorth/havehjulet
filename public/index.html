@@ -206,6 +206,16 @@
   .weather-day .i{font-size:19px;margin:2px 0;}
   .weather-day .t{font-weight:600;color:var(--ink);}
   .weather-day .t small{font-weight:400;opacity:0.55;}
+  .compass{
+    position:absolute;bottom:16px;left:14px;z-index:900;width:38px;height:38px;border-radius:50%;
+    background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--shadow);
+    display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--clay);
+    pointer-events:none;
+  }
+  .compass-needle{
+    position:absolute;top:4px;left:50%;transform:translateX(-50%);width:0;height:0;
+    border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:9px solid var(--clay);
+  }
   .frost-badge{
     background:#5c7a8a22;color:#3d5866;border:1px solid #5c7a8a55;padding:5px 12px;border-radius:999px;
     font-size:11.5px;font-weight:700;white-space:nowrap;
@@ -670,6 +680,7 @@
           <div style="display:flex;gap:8px;margin-top:14px;">
             <button class="reset-month" id="reset-month-btn" onclick="selectMonth(currentMonthIndex(), true)">Vis denne måned</button>
             <button class="reset-month" onclick="exportToCalendar()">📅 Til kalender</button>
+            <button class="reset-month" onclick="exportWheelPng()">🖼️ Gem som billede</button>
           </div>
         </div>
 
@@ -697,6 +708,11 @@
           <div class="journal-head">
             <h3>Mine planter</h3>
             <input class="journal-search" id="journal-search" placeholder="Søg blandt dine planter…" oninput="renderJournal()">
+            <select id="journal-sort" onchange="renderJournal()" style="margin-top:8px;width:100%;padding:7px 9px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);font-size:12px;color:var(--ink);">
+              <option value="name">Sortér: Navn (A-Å)</option>
+              <option value="task">Sortér: Næste opgave</option>
+              <option value="new">Sortér: Senest tilføjet</option>
+            </select>
             <div class="suggest-filters" id="journal-type-filters" style="margin-top:8px;flex-wrap:wrap;"></div>
             <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:var(--soil);cursor:pointer;">
               <input type="checkbox" id="journal-bloom-only" style="width:auto;" onchange="renderJournal()"> Kun de der blomstrer nu
@@ -710,10 +726,12 @@
             <button class="secondary-btn" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('csv-import-input').click()">📥 Importér fra CSV</button>
             <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none;" onchange="importGardenCsv(event)">
             <button class="secondary-btn" id="trash-btn" style="width:100%;" onclick="openTrashModal()">🗑 Papirkurv</button>
+            <button class="secondary-btn" style="width:100%;margin-top:8px;" onclick="openActivityModal()">🕘 Aktivitet</button>
           </div>
         </div>
         <div class="map-col">
           <div id="map"></div>
+          <div class="compass" title="Nord">N<div class="compass-needle"></div></div>
           <div class="map-toolbar">
             <div class="addr-search" style="position:relative;">
               <input type="text" id="addr-input" placeholder="Søg efter din adresse…" onkeydown="if(event.key==='Enter')searchAddress()">
@@ -729,6 +747,7 @@
               <button class="toggle-add-btn" id="bloom-toggle-btn" onclick="toggleBloomFilter()">🌸 Blomstrer nu</button>
               <button class="toggle-add-btn" style="background:var(--soil);" onclick="printMap()">🖨️ Print kort</button>
               <button class="toggle-add-btn" id="measure-toggle-btn" onclick="toggleMeasureMode()">📏 Mål afstand</button>
+              <button class="toggle-add-btn" style="background:var(--fern);" onclick="zoomToFitGarden()">🔎 Vis hele haven</button>
             </div>
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
@@ -861,6 +880,17 @@
       <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
     </div>
     <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ===== ACTIVITY MODAL ===== -->
+<div class="modal-overlay" id="activity-modal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head">
+      <h3>🕘 Aktivitet</h3>
+      <button class="modal-close" onclick="closeModal('activity-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="activity-body"></div>
   </div>
 </div>
 
@@ -1733,6 +1763,7 @@ async function openSettingsModal(){
   try{
     const acc = await apiFetch('/account');
     renderSettingsBody(acc);
+    refreshPushStatus();
   }catch(e){
     body.innerHTML = `<div class="empty-note">Kunne ikke hente kontoindstillinger.</div>`;
   }
@@ -1762,6 +1793,15 @@ function renderSettingsBody(acc){
       <button class="primary-btn" onclick="saveAccountSettings()">Gem</button>
     </div>
     <div class="auth-msg" id="settings-msg"></div>
+
+    <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
+    <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Push-notifikationer</h4>
+    <div class="empty-note" style="margin-bottom:10px;">Modtag rigtige telefon/browser-notifikationer på denne enhed (fx frostvarsler og månedlige påmindelser), i stedet for kun mail.</div>
+    <div id="push-status-box"></div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="secondary-btn" style="flex:1;" onclick="enablePushOnThisDevice()">🔔 Slå til på denne enhed</button>
+      <button class="secondary-btn delete-plant-btn" style="flex:1;" onclick="disablePushOnThisDevice()">Slå fra</button>
+    </div>
 
     <div style="border-top:1px solid var(--line);margin:22px 0 16px;"></div>
     <h4 style="margin:0 0 10px;font-size:14px;color:var(--moss);">Delt have</h4>
@@ -1822,6 +1862,79 @@ async function saveAccountSettings(){
   }catch(e){
     document.getElementById('settings-msg').className = 'auth-msg show error';
     document.getElementById('settings-msg').textContent = e.message || 'Kunne ikke gemme';
+  }
+}
+
+// ---------- Push notifications ----------
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function refreshPushStatus(){
+  const box = document.getElementById('push-status-box');
+  if(!box) return;
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    box.innerHTML = `<div class="empty-note">Din browser understøtter ikke push-notifikationer.</div>`;
+    return;
+  }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    box.innerHTML = sub
+      ? `<div class="empty-note" style="color:var(--fern);">✓ Push er slået til på denne enhed.</div>`
+      : `<div class="empty-note">Push er ikke slået til på denne enhed endnu.</div>`;
+  }catch(e){
+    box.innerHTML = `<div class="empty-note">Kunne ikke tjekke push-status.</div>`;
+  }
+}
+
+async function enablePushOnThisDevice(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    toast('Din browser understøtter ikke push-notifikationer');
+    return;
+  }
+  try{
+    const keyRes = await apiFetch('/push/public-key');
+    if(!keyRes.enabled){
+      toast('Push er ikke sat op på serveren endnu');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      toast('Du skal give tilladelse til notifikationer i browseren');
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyRes.key)
+    });
+    await apiFetch('/push/subscribe', {method:'POST', body: JSON.stringify({subscription: sub})});
+    toast('Push slået til på denne enhed 🔔');
+    refreshPushStatus();
+  }catch(e){
+    toast('Kunne ikke slå push til — prøv igen');
+  }
+}
+
+async function disablePushOnThisDevice(){
+  if(!('serviceWorker' in navigator)) return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      await apiFetch('/push/unsubscribe', {method:'POST', body: JSON.stringify({endpoint: sub.endpoint})});
+      await sub.unsubscribe();
+    }
+    toast('Push slået fra på denne enhed');
+    refreshPushStatus();
+  }catch(e){
+    toast('Kunne ikke slå push fra');
   }
 }
 
@@ -2235,6 +2348,46 @@ function destinationPoint(lat, lng, bearingDeg, distanceM){
   const lat2 = Math.asin(Math.sin(lat1)*Math.cos(distanceM/R) + Math.cos(lat1)*Math.sin(distanceM/R)*Math.cos(brng));
   const lng2 = lng1 + Math.atan2(Math.sin(brng)*Math.sin(distanceM/R)*Math.cos(lat1), Math.cos(distanceM/R)-Math.sin(lat1)*Math.sin(lat2));
   return [lat2*180/Math.PI, lng2*180/Math.PI];
+}
+
+// ---------- Activity log (shared gardens) ----------
+function logActivity(action, target){
+  if(!gardenData.activityLog) gardenData.activityLog = [];
+  gardenData.activityLog.unshift({ user: currentUser, action, target, time: Date.now() });
+  if(gardenData.activityLog.length > 30) gardenData.activityLog.length = 30;
+}
+
+function timeAgo(ts){
+  const s = Math.floor((Date.now()-ts)/1000);
+  if(s < 60) return 'lige nu';
+  const m = Math.floor(s/60);
+  if(m < 60) return `${m} min siden`;
+  const h = Math.floor(m/60);
+  if(h < 24) return `${h} t siden`;
+  const d = Math.floor(h/24);
+  return `${d} dage siden`;
+}
+
+function openActivityModal(){
+  const log = gardenData.activityLog || [];
+  const body = document.getElementById('activity-body');
+  if(!log.length){
+    body.innerHTML = `<div class="empty-note">Ingen aktivitet registreret endnu.</div>`;
+  } else {
+    body.innerHTML = log.map(entry => `<div class="task-item"><div class="icon">👤</div><div class="txt"><b>${escapeHtml(entry.user||'?')}</b> ${escapeHtml(entry.action)} <b>${escapeHtml(entry.target)}</b><br><span style="opacity:0.6;font-size:11px;">${timeAgo(entry.time)}</span></div></div>`).join('');
+  }
+  document.getElementById('activity-modal').classList.add('show');
+}
+
+function zoomToFitGarden(){
+  const points = [];
+  gardenData.plants.forEach(p=>{
+    if(p.polygon && p.polygon.length) p.polygon.forEach(pt=>points.push([pt.lat, pt.lng]));
+    else if(p.lat!=null && p.lng!=null) points.push([p.lat, p.lng]);
+  });
+  (gardenData.addresses||[]).forEach(a=>points.push([a.lat, a.lng]));
+  if(!points.length){ toast('Ingen planter eller adresser at vise endnu'); return; }
+  map.fitBounds(L.latLngBounds(points), { padding:[50,50], maxZoom:19 });
 }
 
 function toggleSunOverlay(){
@@ -2705,10 +2858,20 @@ function setJournalTypeFilter(f){
   renderJournal();
 }
 
+function taskUrgencyRank(p){
+  if(!p.tasks) return 999;
+  const cm = currentMonthIndex();
+  for(let i=0;i<12;i++){
+    if(p.tasks[(cm+i)%12]) return i;
+  }
+  return 999;
+}
+
 function renderJournal(){
   renderJournalTypeFilters();
   const q = (document.getElementById('journal-search')?.value || '').toLowerCase();
   const bloomOnly = document.getElementById('journal-bloom-only')?.checked;
+  const sortBy = document.getElementById('journal-sort')?.value || 'name';
   const list = document.getElementById('journal-list');
   const items = gardenData.plants.filter(p =>
     p.name.toLowerCase().includes(q) &&
@@ -2716,6 +2879,13 @@ function renderJournal(){
     (!bloomOnly || bloomMatchesCurrentMonth(p.bloom)) &&
     (!gardenGroupFilter || p.addressGroup===gardenGroupFilter)
   );
+  if(sortBy==='task'){
+    items.sort((a,b)=> taskUrgencyRank(a) - taskUrgencyRank(b));
+  } else if(sortBy==='new'){
+    items.sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+  } else {
+    items.sort((a,b)=> a.name.localeCompare(b.name, 'da'));
+  }
   if(!items.length){
     list.innerHTML = `<div class="journal-empty">${gardenData.plants.length? 'Ingen planter matcher dine filtre.' : 'Du har ikke registreret nogen planter endnu. Find din adresse på kortet, tryk “Tilføj plante”, og klik hvor den står.'}</div>`;
     return;
@@ -2825,6 +2995,7 @@ function saveAddress(){
   };
   if(!gardenData.addresses) gardenData.addresses = [];
   gardenData.addresses.push(addr);
+  logActivity('gemte adressen', addr.name);
   saveGarden();
   renderAddressList();
   renderAddressMarkers();
@@ -3295,13 +3466,16 @@ function savePlant(){
     tasks: collectTasksFromFields(),
     bee: BEE_FRIENDLY_NAMES.has(name),
     addressGroup: document.getElementById('plant-address-group').value || null,
+    createdAt: existing ? (existing.createdAt || Date.now()) : Date.now(),
     photos: existing ? (existing.photos || []) : []
   };
   if(editingPlantId){
     const idx = gardenData.plants.findIndex(p=>p.id===editingPlantId);
     gardenData.plants[idx] = plant;
+    logActivity('redigerede', plant.name);
   } else {
     gardenData.plants.push(plant);
+    logActivity(polygon ? 'tilføjede bedet' : 'tilføjede', plant.name);
   }
   saveGarden();
   renderMarkers();
@@ -3473,6 +3647,39 @@ function exportGardenPdf(){
   toast('PDF downloadet');
 }
 
+// ---------- Year wheel image export ----------
+function exportWheelPng(){
+  const svg = document.getElementById('year-wheel');
+  if(!svg){ toast('Kunne ikke finde årshjulet'); return; }
+  let svgStr = new XMLSerializer().serializeToString(svg);
+  if(!svgStr.includes('xmlns=')) svgStr = svgStr.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = function(){
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = 500*scale; canvas.height = 500*scale;
+    const ctx = canvas.getContext('2d');
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--parchment').trim() || '#f4efdd';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(blob=>{
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'havehjulet-aarshjul.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast('Billede downloadet');
+    });
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); toast('Kunne ikke eksportere hjulet'); };
+  img.src = url;
+}
+
 // ---------- Calendar export (iCal) ----------
 function icsEscape(text){
   return String(text).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
@@ -3588,6 +3795,7 @@ function savePest(){
     date: document.getElementById('pest-date').value || new Date().toISOString().slice(0,10),
     note: document.getElementById('pest-note').value.trim()
   });
+  logActivity('registrerede skadedyr', name);
   saveGarden();
   renderPestMarkers();
   closeModal('pest-modal');
@@ -3734,6 +3942,7 @@ function finishMovePlant(latlng){
   }
   p.lat = latlng.lat;
   p.lng = latlng.lng;
+  logActivity('flyttede', p.name);
 
   saveGarden();
   renderMarkers();
@@ -3942,6 +4151,7 @@ function duplicatePlant(id){
     copy.polygon = copy.polygon.map(pt=>({lat: pt.lat+0.00006, lng: pt.lng+0.00006}));
   }
   gardenData.plants.push(copy);
+  logActivity('duplikerede', p.name);
   saveGarden();
   renderMarkers();
   renderJournal();
@@ -3957,6 +4167,7 @@ function deletePlant(id){
   if(idx===-1) return;
   const [removed] = gardenData.plants.splice(idx, 1);
   removed.deletedAt = Date.now();
+  logActivity('slettede', removed.name);
   if(!gardenData.trash) gardenData.trash = [];
   gardenData.trash.push(removed);
   saveGarden();
