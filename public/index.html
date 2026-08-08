@@ -3312,7 +3312,7 @@ function renderOnlineSection(label, state, onPick){
       html += `<div class="db-result-item" style="opacity:0.6;cursor:default;">Ingen resultater</div>`;
     } else {
       html += state.map(r=>`<div class="db-result-item" onclick="${onPick}(${r.id})">
-          ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" style="width:22px;height:22px;object-fit:cover;border-radius:5px;">` : `<span>🌱</span>`}
+          ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" style="width:22px;height:22px;object-fit:cover;border-radius:5px;" onerror="this.outerHTML='<span>🌱</span>';">` : `<span>🌱</span>`}
           <span>${escapeHtml(r.common_name)} <span style="opacity:0.55;font-size:11px;font-style:italic;">${r.scientific ? escapeHtml(r.scientific) : ''}</span></span>
         </div>`).join('');
     }
@@ -3522,7 +3522,8 @@ async function pickExternal(id){
     populateTaskFields(pickedDb.tasks);
     toast('Data hentet fra Perenual');
   }catch(e){
-    toast('Kunne ikke hente detaljer — prøv igen');
+    console.error('Perenual pick-fejl:', e);
+    toast('Perenual: ' + (e.message || 'Kunne ikke hente detaljer'));
     box.classList.remove('show');
   }
 }

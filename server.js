@@ -434,8 +434,13 @@ app.get('/api/plants/details/:id', authMiddleware, async (req, res) => {
     const url = `https://perenual.com/api/species/details/${id}?key=${encodeURIComponent(PERENUAL_API_KEY)}`;
     const r = await fetch(url);
     const data = await r.json();
+    if(!r.ok){
+      console.error('Perenual details fejl:', r.status, JSON.stringify(data));
+      return res.status(r.status).json({ error: data.message || data.error || `Perenual svarede med status ${r.status}` });
+    }
     res.json(data);
   }catch(e){
+    console.error('Perenual details exception:', e.message);
     res.status(502).json({ error: 'Kunne ikke kontakte Perenual' });
   }
 });
