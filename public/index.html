@@ -359,8 +359,9 @@
     background:var(--clay);color:#fff;border:none;border-radius:9px;padding:11px 16px;font-size:13px;font-weight:600;box-shadow:var(--shadow);white-space:nowrap;
   }
   .toggle-add-btn.active{background:var(--gold);color:var(--ink);}
+  .addr-search{position:relative;z-index:1002;}
   .addr-suggestions{
-    position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:var(--shadow);z-index:1001;
+    position:absolute;top:100%;left:0;right:0;background:var(--surface);opacity:1;border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,0.35);z-index:2000;
   }
   .addr-suggestions div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);}
   .addr-suggestions div:last-child{border-bottom:none;}
