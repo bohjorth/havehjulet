@@ -166,6 +166,8 @@ app.get('/api/account', authMiddleware, (req, res) => {
     username: req.username,
     email: user.email || '',
     remindersEnabled: !!user.remindersEnabled,
+    frostAlertsEnabled: !!user.frostAlertsEnabled,
+    backupEmailEnabled: !!user.backupEmailEnabled,
     gardenId: req.gardenId,
     isOwnGarden: req.gardenId === req.username,
     members: garden.members || [req.username],
@@ -176,15 +178,19 @@ app.get('/api/account', authMiddleware, (req, res) => {
 app.put('/api/account', authMiddleware, (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const remindersEnabled = !!req.body.remindersEnabled;
+  const frostAlertsEnabled = !!req.body.frostAlertsEnabled;
+  const backupEmailEnabled = !!req.body.backupEmailEnabled;
   if(email && !EMAIL_RE.test(email)){
     return res.status(400).json({ error: 'Ugyldig e-mailadresse' });
   }
-  if(remindersEnabled && !email){
-    return res.status(400).json({ error: 'Angiv en e-mail for at slå påmindelser til' });
+  if((remindersEnabled || frostAlertsEnabled || backupEmailEnabled) && !email){
+    return res.status(400).json({ error: 'Angiv en e-mail for at slå mail-funktioner til' });
   }
   const db = readDb();
   db.users[req.username].email = email || null;
   db.users[req.username].remindersEnabled = remindersEnabled;
+  db.users[req.username].frostAlertsEnabled = frostAlertsEnabled;
+  db.users[req.username].backupEmailEnabled = backupEmailEnabled;
   writeDb(db);
   res.json({ ok: true });
 });
@@ -507,13 +513,57 @@ async function runMonthlyReminders(targetUsername){
     if(!user || !user.email || !user.remindersEnabled) continue;
     const gardenId = resolveGardenId(db, username).gardenId;
     const body = buildMonthEmailBody(gardenId, month, db);
-    await sendMail({
+    const mail = {
       to: user.email,
       subject: `Havehjulet — det sker i din have i ${MONTHS_FULL[month]}`,
       text: `Hej ${username}\n\nHer er hvad der er værd at kigge på i haven i ${MONTHS_FULL[month]}:\n\n${body}\n\nÅbn Havehjulet for flere detaljer.`
-    });
+    };
+    if(user.backupEmailEnabled){
+      const garden = db.gardens[gardenId] || emptyGarden();
+      mail.attachments = [{
+        filename: `havehjulet-backup-${new Date().toISOString().slice(0,10)}.json`,
+        content: JSON.stringify(garden, null, 2)
+      }];
+      mail.text += `\n\nDin havedata er vedhæftet som backup (JSON-fil).`;
+    }
+    await sendMail(mail);
   }
   writeDb(db); // persists any gardenId migration from resolveGardenId
+}
+
+// ---------- Frost alerts ----------
+async function checkFrostAlerts(){
+  const db = readDb();
+  let changed = false;
+  for(const username of Object.keys(db.users)){
+    const user = db.users[username];
+    if(!user.email || !user.frostAlertsEnabled) continue;
+    const gardenId = resolveGardenId(db, username).gardenId;
+    const garden = db.gardens[gardenId];
+    const addr = garden && garden.addresses && garden.addresses[0];
+    if(!addr) continue;
+    try{
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${addr.lat}&longitude=${addr.lng}&daily=temperature_2m_min&timezone=auto&forecast_days=3`;
+      const r = await fetch(url);
+      const data = await r.json();
+      const mins = (data.daily && data.daily.temperature_2m_min) || [];
+      const dates = (data.daily && data.daily.time) || [];
+      const frostIdx = mins.findIndex(t => t <= 0);
+      if(frostIdx === -1) continue;
+      const frostDate = dates[frostIdx];
+      if(user.lastFrostAlertDate === frostDate) continue; // already alerted for this exact night
+      await sendMail({
+        to: user.email,
+        subject: `❄️ Frostrisiko i din have — ${frostDate}`,
+        text: `Hej ${username}\n\nDer er varslet frost (ned til ${mins[frostIdx]}°C) ved "${addr.name}" den ${frostDate}. Overvej at dække sarte planter til eller hente potteplanter ind.\n\nÅbn Havehjulet for detaljer.`
+      });
+      user.lastFrostAlertDate = frostDate;
+      changed = true;
+    }catch(e){
+      console.error(`Frostvarsel fejlede for ${username}:`, e.message);
+    }
+  }
+  if(changed) writeDb(db);
 }
 
 app.post('/api/reminders/send-test', authMiddleware, async (req, res) => {
@@ -529,6 +579,11 @@ app.post('/api/reminders/send-test', authMiddleware, async (req, res) => {
 // 08:00 on the 1st of every month
 cron.schedule('0 8 1 * *', () => {
   runMonthlyReminders().catch(err => console.error('Fejl i månedlig påmindelse:', err));
+});
+
+// 06:30 every day — checks the next 3 days for frost per garden
+cron.schedule('30 6 * * *', () => {
+  checkFrostAlerts().catch(err => console.error('Fejl i frostvarsel:', err));
 });
 
 // ---------- Admin overview (read-only) ----------

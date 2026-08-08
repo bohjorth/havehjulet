@@ -728,11 +728,13 @@
               <button class="toggle-add-btn" id="pest-toggle-btn" onclick="togglePestMode()">🐌 Skadedyr</button>
               <button class="toggle-add-btn" id="bloom-toggle-btn" onclick="toggleBloomFilter()">🌸 Blomstrer nu</button>
               <button class="toggle-add-btn" style="background:var(--soil);" onclick="printMap()">🖨️ Print kort</button>
+              <button class="toggle-add-btn" id="measure-toggle-btn" onclick="toggleMeasureMode()">📏 Mål afstand</button>
             </div>
           </div>
           <div class="add-mode-banner" id="add-mode-banner">Klik et sted på kortet for at placere din plante 🌱</div>
           <div class="add-mode-banner" id="area-mode-banner"></div>
           <div class="add-mode-banner" id="pest-mode-banner">Klik hvor du ser skadedyr/sygdom 🐌</div>
+          <div class="add-mode-banner" id="measure-mode-banner">Klik to punkter på kortet for at måle afstanden 📏</div>
           <div class="add-mode-banner" id="shape-edit-banner">Træk i de gyldne hjørner for at ændre formen — klik på et hjørne for at fjerne det.
             <button class="mini-btn finish" onclick="saveShapeEdit()">✓ Gem form</button>
             <button class="mini-btn cancel" onclick="cancelShapeEdit()">✕ Annullér</button>
@@ -1303,6 +1305,9 @@ let markerLayer = null;
 let addressMarkerLayer = null;
 let pestMarkerLayer = null;
 let pestMode = false;
+let measureMode = false;
+let measurePoints = [];
+let measureLayer = null;
 let pendingPestLatLng = null;
 let addMode = false;
 let areaMode = false;
@@ -1579,10 +1584,25 @@ async function loadWeather(){
           ${frostDay ? `<div class="frost-badge">❄️ Frostrisiko ${dayNames[frostDay.date.getDay()]}</div>` : ''}
           ${droughtHtml}
         </div>
-      </div>`;
+      </div>
+      ${validPast.length ? renderPrecipHistory(validPast) : ''}`;
   }catch(e){
     el.innerHTML = `<div class="weather-card weather-empty">Kunne ikke hente vejrdata lige nu</div>`;
   }
+}
+
+function renderPrecipHistory(days){
+  const max = Math.max(1, ...days.map(d=>d.precip));
+  const bars = days.map(d=>{
+    const h = Math.max(2, Math.round((d.precip/max)*36));
+    return `<div title="${d.date.toLocaleDateString('da-DK')}: ${d.precip.toFixed(1)} mm" style="flex:1;height:36px;display:flex;align-items:flex-end;">
+        <div style="width:100%;height:${h}px;background:${d.precip>0?'#5c7a8a':'var(--parchment-3)'};border-radius:2px 2px 0 0;"></div>
+      </div>`;
+  }).join('');
+  return `<div class="weather-card" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:6px;">
+      <div class="today-mono" style="font-size:11px;opacity:0.65;">Nedbør, seneste ${days.length} dage</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;">${bars}</div>
+    </div>`;
 }
 
 // ---------- Settings (account, reminders, shared garden) ----------
@@ -1729,6 +1749,14 @@ function renderSettingsBody(acc){
       <input type="checkbox" id="settings-reminders" ${acc.remindersEnabled?'checked':''} style="width:auto;">
       <label style="margin:0;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);">Send mig en månedlig påmindelse om havens opgaver</label>
     </div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="settings-frost" ${acc.frostAlertsEnabled?'checked':''} style="width:auto;">
+      <label style="margin:0;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);">❄️ Send mig en mail når der er varslet frost (kræver en gemt adresse)</label>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="settings-backup-email" ${acc.backupEmailEnabled?'checked':''} style="width:auto;">
+      <label style="margin:0;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);">Vedhæft en JSON-backup af haven til den månedlige mail</label>
+    </div>
     <div class="modal-actions">
       <button class="secondary-btn" onclick="sendTestReminder()">Send test-mail nu</button>
       <button class="primary-btn" onclick="saveAccountSettings()">Gem</button>
@@ -1785,8 +1813,10 @@ function renderSettingsBody(acc){
 async function saveAccountSettings(){
   const email = document.getElementById('settings-email').value.trim();
   const remindersEnabled = document.getElementById('settings-reminders').checked;
+  const frostAlertsEnabled = document.getElementById('settings-frost').checked;
+  const backupEmailEnabled = document.getElementById('settings-backup-email').checked;
   try{
-    await apiFetch('/account', {method:'PUT', body: JSON.stringify({email, remindersEnabled})});
+    await apiFetch('/account', {method:'PUT', body: JSON.stringify({email, remindersEnabled, frostAlertsEnabled, backupEmailEnabled})});
     document.getElementById('settings-msg').className = 'auth-msg show ok';
     document.getElementById('settings-msg').textContent = 'Gemt!';
   }catch(e){
@@ -1812,10 +1842,18 @@ async function showViewLink(){
       <div class="db-picked" style="flex-direction:column;align-items:flex-start;gap:6px;">
         <span>Del dette link — ingen login nødvendig for at kigge:</span>
         <span class="mono" style="font-size:12px;word-break:break-all;user-select:all;">${escapeHtml(url)}</span>
+        <button class="secondary-btn" style="padding:5px 12px;font-size:11.5px;" onclick="copyToClipboard('${url}')">📋 Kopiér link</button>
       </div>`;
   }catch(e){
     toast('Kunne ikke hente visningslink');
   }
+}
+
+function copyToClipboard(text){
+  navigator.clipboard?.writeText(text).then(
+    ()=>toast('Kopieret!'),
+    ()=>toast('Kunne ikke kopiere — markér og kopiér manuelt')
+  );
 }
 async function revokeViewLink(){
   if(!confirm('Deaktivér det delte visningslink? Et evt. eksisterende link vil stoppe med at virke.')) return;
@@ -1836,6 +1874,7 @@ async function showInviteCode(){
         <span>Del denne kode med resten af husstanden:</span>
         <b class="mono" style="font-size:15px;user-select:all;">${escapeHtml(res.code)}</b>
         ${res.joinUrl ? `<span style="font-size:11.5px;word-break:break-all;">${escapeHtml(res.joinUrl)}</span>` : ''}
+        <button class="secondary-btn" style="padding:5px 12px;font-size:11.5px;" onclick="copyToClipboard('${res.joinUrl || res.code}')">📋 Kopiér</button>
       </div>`;
   }catch(e){
     toast('Kunne ikke hente invitationskode');
@@ -2135,6 +2174,10 @@ function initMapIfNeeded(){
     }
     if(pestMode){
       openPestModal(e.latlng);
+      return;
+    }
+    if(measureMode){
+      addMeasurePoint(e.latlng);
     }
   });
 
@@ -2147,7 +2190,12 @@ function initMapIfNeeded(){
 
 function toggleAddMode(){
   addMode = !addMode;
-  if(addMode) resetAreaDrawing();
+  if(addMode){ resetAreaDrawing(); pestMode=false; measureMode=false; clearMeasure();
+    document.getElementById('pest-toggle-btn')?.classList.remove('active');
+    document.getElementById('pest-mode-banner')?.classList.remove('show');
+    document.getElementById('measure-toggle-btn')?.classList.remove('active');
+    document.getElementById('measure-mode-banner')?.classList.remove('show');
+  }
   document.getElementById('add-toggle-btn').classList.toggle('active', addMode);
   document.getElementById('add-mode-banner').classList.toggle('show', addMode);
 }
@@ -2156,9 +2204,13 @@ function toggleAddMode(){
 function toggleAreaMode(){
   areaMode = !areaMode;
   if(areaMode){
-    addMode = false;
+    addMode = false; pestMode = false; measureMode = false; clearMeasure();
     document.getElementById('add-toggle-btn').classList.remove('active');
     document.getElementById('add-mode-banner').classList.remove('show');
+    document.getElementById('pest-toggle-btn')?.classList.remove('active');
+    document.getElementById('pest-mode-banner')?.classList.remove('show');
+    document.getElementById('measure-toggle-btn')?.classList.remove('active');
+    document.getElementById('measure-mode-banner')?.classList.remove('show');
   } else {
     resetAreaDrawing();
   }
@@ -3493,9 +3545,11 @@ let selectedPestIcon = PEST_TYPES[0].icon;
 
 function togglePestMode(){
   pestMode = !pestMode;
-  addMode = false; areaMode = false;
+  addMode = false; areaMode = false; measureMode = false; clearMeasure();
   document.getElementById('add-toggle-btn').classList.remove('active');
   document.getElementById('add-mode-banner').classList.remove('show');
+  document.getElementById('measure-toggle-btn')?.classList.remove('active');
+  document.getElementById('measure-mode-banner')?.classList.remove('show');
   resetAreaDrawing();
   document.getElementById('pest-toggle-btn').classList.toggle('active', pestMode);
   document.getElementById('pest-mode-banner').classList.toggle('show', pestMode);
@@ -3580,6 +3634,60 @@ function deletePest(id){
   renderPestMarkers();
   closeModal('pest-detail-modal');
   toast('Slettet');
+}
+
+// ---------- Measure distance ----------
+function toggleMeasureMode(){
+  measureMode = !measureMode;
+  addMode = false; areaMode = false; pestMode = false;
+  document.getElementById('add-toggle-btn').classList.remove('active');
+  document.getElementById('add-mode-banner').classList.remove('show');
+  document.getElementById('pest-toggle-btn').classList.remove('active');
+  document.getElementById('pest-mode-banner').classList.remove('show');
+  resetAreaDrawing();
+  clearMeasure();
+  document.getElementById('measure-mode-banner').textContent = 'Klik to punkter på kortet for at måle afstanden 📏';
+  document.getElementById('measure-toggle-btn').classList.toggle('active', measureMode);
+  document.getElementById('measure-mode-banner').classList.toggle('show', measureMode);
+}
+
+function clearMeasure(){
+  measurePoints = [];
+  if(measureLayer){ map.removeLayer(measureLayer); measureLayer = null; }
+}
+
+function addMeasurePoint(latlng){
+  measurePoints.push(latlng);
+  if(measureLayer){ map.removeLayer(measureLayer); measureLayer = null; }
+
+  if(measurePoints.length === 1){
+    measureLayer = L.circleMarker(latlng, { radius:5, color:'#bd5468', fillColor:'#bd5468', fillOpacity:1 }).addTo(map);
+    document.getElementById('measure-mode-banner').textContent = 'Klik endnu et punkt for at fuldføre målingen 📏';
+    return;
+  }
+
+  const [p1, p2] = measurePoints;
+  const meters = haversineMeters(p1.lat, p1.lng, p2.lat, p2.lng);
+  const label = meters >= 1000 ? `${(meters/1000).toFixed(2)} km` : `${Math.round(meters)} m`;
+  const mid = L.latLng((p1.lat+p2.lat)/2, (p1.lng+p2.lng)/2);
+
+  const group = L.layerGroup();
+  L.polyline([p1, p2], { color:'#bd5468', weight:3, dashArray:'6,5' }).addTo(group);
+  L.circleMarker(p1, { radius:5, color:'#bd5468', fillColor:'#bd5468', fillOpacity:1 }).addTo(group);
+  L.circleMarker(p2, { radius:5, color:'#bd5468', fillColor:'#bd5468', fillOpacity:1 }).addTo(group);
+  L.marker(mid, {
+    icon: L.divIcon({
+      className:'',
+      html:`<div style="transform:translate(-50%,-50%);background:#bd5468;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);">📏 ${label}</div>`,
+      iconSize:[0,0]
+    }),
+    interactive:false
+  }).addTo(group);
+  group.addTo(map);
+  measureLayer = group;
+
+  document.getElementById('measure-mode-banner').innerHTML = `Afstand: <b>${label}</b> — klik for at måle igen <button class="mini-btn cancel" onclick="clearMeasure();document.getElementById('measure-mode-banner').textContent='Klik to punkter på kortet for at måle afstanden 📏';">✕ Ryd</button>`;
+  measurePoints = [];
 }
 
 
@@ -3729,6 +3837,7 @@ function openDetail(id){
     ${viewOnlyMode ? '' : `<div class="modal-actions">
       <button class="secondary-btn delete-plant-btn" onclick="deletePlant('${p.id}')">Slet plante</button>
       <button class="secondary-btn" onclick="openQrModal('${p.id}')">🔖 QR-mærke</button>
+      <button class="secondary-btn" onclick="duplicatePlant('${p.id}')">📋 Dupliker</button>
       ${p.polygon ? `<button class="secondary-btn" onclick="startShapeEdit('${p.id}')">✎ Ret form</button>` : ''}
       <button class="primary-btn" onclick="editPlant('${p.id}')">Redigér</button>
     </div>`}
@@ -3764,6 +3873,31 @@ function editPlant(id){
   buildTaskMonthGrid();
   populateTaskFields(p.tasks || {});
   document.getElementById('add-modal').classList.add('show');
+}
+
+function duplicatePlant(id){
+  const p = gardenData.plants.find(x=>x.id===id);
+  if(!p) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = 'p'+Date.now()+Math.random().toString(36).slice(2,7);
+  copy.name = p.name + ' (kopi)';
+  copy.photos = [];
+  copy.waterLog = [];
+  // nudge it slightly so it doesn't sit exactly on top of the original
+  copy.lat = p.lat + 0.00006;
+  copy.lng = p.lng + 0.00006;
+  if(copy.polygon){
+    copy.polygon = copy.polygon.map(pt=>({lat: pt.lat+0.00006, lng: pt.lng+0.00006}));
+  }
+  gardenData.plants.push(copy);
+  saveGarden();
+  renderMarkers();
+  renderJournal();
+  buildYearWheel();
+  renderTypeChart();
+  updateBellBadge();
+  closeModal('detail-modal');
+  toast(`"${p.name}" duplikeret — husk at flytte den til rette sted 📍`);
 }
 
 function deletePlant(id){
